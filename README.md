@@ -8,7 +8,7 @@ Body:
 "password": "Password123!"
 }
 
-2) Create Employee (Auto username, mail, emp_id) - POST /api/create-employee/
+3) Create Employee (Auto username, mail, emp_id) - POST /api/create-employee/
 Body:
 {
 "first_name": "John",
@@ -21,22 +21,22 @@ Body:
 "location": "Hyderabad"
 }
 
-3) Employee List - GET /api/employee-list/
+4) Employee List - GET /api/employee-list/
 Headers: Authorization: Bearer 
 
-4) Employee Full Details - GET /api/employees/id/
+5) Employee Full Details - GET /api/employees/id/
 Headers: Authorization: Bearer 
 
-5) HR Update Employee - PATCH /api/employees/id/
+6) HR Update Employee - PATCH /api/employees/id/
 Body example:
 {
 "department": "Tech",
 "job_title": "Senior Developer"
 }
 
-6) HR View Employee Attendance Monthly - GET /api/attendance/hr/employee/id/?month=2025-11
+7) HR View Employee Attendance Monthly - GET /api/attendance/hr/employee/id/?month=2025-11
 
-7) HR All Employees Attendance Summary - GET /api/attendance/hr/monthly-report/?month=2025-11
+8) HR All Employees Attendance Summary - GET /api/attendance/hr/monthly-report/?month=2025-11
 
 Employee APIs
 
