@@ -59,7 +59,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 class VerifyOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    otp = serializers.CharField(max_length=4)
+    otp = serializers.CharField(max_length=6, min_length=6)
 
     def validate(self, data):
         email = data["email"]

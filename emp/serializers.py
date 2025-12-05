@@ -1,5 +1,7 @@
 # emp/serializers.py
 from rest_framework import serializers
+
+from login import models
 from .models import (
     EmployeeProfile, Notification, Shift, Attendance, CalendarEvent,
     SalaryStructure, EmployeeSalary, Payslip,
@@ -8,10 +10,11 @@ from .models import (
 from django.contrib.auth import get_user_model
 from django.utils.crypto import get_random_string
 from django.utils import timezone
+from django.urls import reverse
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 
 User = get_user_model()
-
-# ---- nested helper serializers used for HR create ----
 
 
 class ContactSerializer(serializers.Serializer):
@@ -36,7 +39,8 @@ class ContactSerializer(serializers.Serializer):
 class JobSerializer(serializers.Serializer):
     job_title = serializers.CharField(required=True, max_length=150)
     department = serializers.CharField(required=True)
-    team_lead = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    team_lead = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True)
     employment_type = serializers.ChoiceField(choices=[(
         'full_time', 'Full Time'), ('contract', 'Contract'), ('intern', 'Intern')], required=True)
     start_date = serializers.DateField(required=True)
@@ -71,8 +75,6 @@ class IdentificationSerializer(serializers.Serializer):
     passport_number = serializers.CharField(
         required=False, allow_blank=True, max_length=20)
     passport_image = serializers.ImageField(required=False, allow_null=True)
-
-# Profile
 
 
 class EmployeeCreateSerializer(serializers.Serializer):
@@ -239,12 +241,96 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
             'gender', 'marital_status',
             'job_title', 'department', 'team_lead', 'employment_type', 'start_date',
             'location', 'job_description', 'id_image', 'profile_photo',
-            'bank_name', 'ifsc_code', 'account_number', 'branch',
-            'aadhaar_number', 'aadhaar_image', 'pan', 'pan_image', 'passport_number', 'passport_image',
+            'bank_name', 'ifsc_code', 'masked_account_number', 'branch',
+            'masked_aadhaar', 'aadhaar_image', 'masked_pan', 'pan_image', 'masked_passport', 'passport_image',
             'role', 'created_at', 'updated_at'
         )
         read_only_fields = ('emp_id', 'work_email', 'user',
                             'created_at', 'updated_at')
+
+        def mask_number(self, value):
+            if not value:
+                return value
+            return "*" * (len(value) - 4) + value[-4:]
+
+        def get_masked_aadhaar(self, obj):
+            return self.mask_number(obj.aadhaar_number)
+
+        def get_masked_pan(self, obj):
+            return self.mask_number(obj.pan)
+
+        def get_masked_passport(self, obj):
+            return self.mask_number(obj.passport_number)
+
+        def get_masked_account_number(self, obj):
+            return self.mask_number(obj.account_number)
+
+    masked_aadhaar = serializers.SerializerMethodField()
+    masked_pan = serializers.SerializerMethodField()
+    masked_passport = serializers.SerializerMethodField()
+    masked_account_number = serializers.SerializerMethodField()
+
+    protected_profile_photo_url = serializers.SerializerMethodField()
+    protected_aadhaar_image_url = serializers.SerializerMethodField()
+    protected_pan_image_url = serializers.SerializerMethodField()
+    protected_passport_image_url = serializers.SerializerMethodField()
+    protected_id_image_url = serializers.SerializerMethodField()
+
+    def get_protected_profile_photo_url(self, obj):
+        request = self.context.get("request", None)
+        try:
+            url = reverse("protected_employee_media",
+                          args=[obj.pk, "profile_photo"])
+        except Exception:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        # fallback: build a relative url
+        return url
+
+    def get_protected_aadhaar_image_url(self, obj):
+        request = self.context.get("request", None)
+        try:
+            url = reverse("protected_employee_media",
+                          args=[obj.pk, "aadhaar_image"])
+        except Exception:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_protected_pan_image_url(self, obj):
+        request = self.context.get("request", None)
+        try:
+            url = reverse("protected_employee_media",
+                          args=[obj.pk, "pan_image"])
+        except Exception:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_protected_passport_image_url(self, obj):
+        request = self.context.get("request", None)
+        try:
+            url = reverse("protected_employee_media",
+                          args=[obj.pk, "passport_image"])
+        except Exception:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_protected_id_image_url(self, obj):
+        request = self.context.get("request", None)
+        try:
+            url = reverse("protected_employee_media",
+                          args=[obj.pk, "id_image"])
+        except Exception:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
     def get_user(self, obj):
         return {
@@ -364,6 +450,15 @@ class LeaveApplySerializer(serializers.Serializer):
     reason = serializers.CharField(allow_blank=True, required=False)
 
     def validate(self, data):
+        """
+        - Ensure start/end date sanity
+        - Check for overlapping leave requests for the same profile
+        - Verify leave_type exists
+        - Verify the profile has sufficient available balance for the requested days
+        NOTE: serializer expects the request in self.context['request'] so the profile can be accessed.
+        """
+        from django.db.models import Q
+        from decimal import Decimal
         today = timezone.localdate()
         start = data.get('start_date')
         end = data.get('end_date')
@@ -374,7 +469,70 @@ class LeaveApplySerializer(serializers.Serializer):
         if end < start:
             raise serializers.ValidationError(
                 {"end_date": "End date cannot be before start date."})
+
+        # compute inclusive days (integer)
+        requested_days = (end - start).days + 1
+
+        # Require request in context so we can access the user/profile
+        req = self.context.get('request')
+        if not req or not getattr(req, 'user', None):
+            # If no request present, fail-safe: allow (but log). Prefer having request in context.
+            return data
+
+        profile = getattr(req.user, 'employeeprofile', None)
+        if not profile:
+            raise serializers.ValidationError(
+                "Employee profile not found for current user.")
+
+        # 1) Overlap check: any non-rejected leaves that overlap with start..end
+        overlapping = models.LeaveRequest.objects.filter(
+            profile=profile
+        ).exclude(status__in=['tl_rejected', 'hr_rejected', 'rejected']).filter(
+            start_date__lte=end,
+            end_date__gte=start
+        ).exists()
+
+        if overlapping:
+            raise serializers.ValidationError(
+                {"non_field_errors": "You already have a leave request that overlaps these dates."}
+            )
+
+        # 2) Validate leave_type exists (case-insensitive)
+        leave_type_name = data.get('leave_type', '').strip()
+        lt = models.LeaveType.objects.filter(
+            name__iexact=leave_type_name).first()
+        if not lt:
+            raise serializers.ValidationError(
+                {"leave_type": f"Leave type '{leave_type_name}' not found."}
+            )
+
+        # 3) Check leave balance if available
+        lb = models.LeaveBalance.objects.filter(
+            profile=profile, leave_type=lt).first()
+        if lb:
+            # compute available as Decimal
+            try:
+                available = Decimal(lb.total_allocated) - Decimal(lb.used)
+            except Exception:
+                # defensive fallback
+                available = None
+            if available is not None:
+                if Decimal(requested_days) > available:
+                    raise serializers.ValidationError(
+                        {"non_field_errors": f"Insufficient leave balance for '{lt.name}'. Requested: {requested_days}, Available: {available}."}
+                    )
+        # if no LeaveBalance found we allow apply (allocations may be done later by HR)
+        # but you may choose to block instead by uncommenting the lines below:
+        # else:
+        #     raise serializers.ValidationError({"leave_type": "No leave balance configured for this leave type. Contact HR."})
+
+        # attach computed days for the view to reuse (optional)
+        data['calculated_days'] = requested_days
+        # also attach normalized leave_type object name (frontend may send different casing)
+        data['normalized_leave_type'] = lt.name
+
         return data
+
 
 # Policies
 

@@ -252,39 +252,106 @@ class LeaveApplyAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        ser = serializers.LeaveApplySerializer(data=request.data)
+        ser = serializers.LeaveApplySerializer(
+            data=request.data,
+            context={'request': request}
+        )
         ser.is_valid(raise_exception=True)
 
         prof = request.user.employeeprofile
-
         start = ser.validated_data['start_date']
         end = ser.validated_data['end_date']
 
-        # AUTO CALCULATE DURATION (inclusive days)
-        duration_days = (end - start).days + 1
+        # ------------------------------------------------------------------
+        # 1. If the applicant is a TL → skip TL approval, send to HR
+        # ------------------------------------------------------------------
+        if request.user.role == 'tl':
+            route_direct_to_hr = True
+            actionable_tl = None
+        else:
+            route_direct_to_hr = False
+            actionable_tl = None
 
-        # create leave request with textual leave_type
+        # ------------------------------------------------------------------
+        # 2. Employee case → Select actionable TL
+        # ------------------------------------------------------------------
+        if not route_direct_to_hr:
+            primary_tl = prof.team_lead
+            actionable_tl = primary_tl
+
+            # CASE 1: No TL assigned → go directly to HR
+            if not primary_tl:
+                route_direct_to_hr = True
+            else:
+                # CASE 2: TL exists → check if TL is on leave
+                tl_profile = getattr(primary_tl, 'employeeprofile', None)
+
+                if tl_profile and tl_profile.is_on_leave(start, end):
+                    # TL unavailable → find backup TL from same department
+                    fallback_tls = (
+                        get_user_model()
+                        .objects.filter(
+                            role='tl',
+                            employeeprofile__department=prof.department
+                        )
+                        .exclude(id=primary_tl.id)
+                    )
+
+                    found_replacement = False
+                    for tl_user in fallback_tls:
+                        if not tl_user.employeeprofile.is_on_leave(start, end):
+                            actionable_tl = tl_user
+                            found_replacement = True
+                            break
+
+                    # CASE 3: No replacement TL → escalate to HR
+                    if not found_replacement:
+                        route_direct_to_hr = True
+
+        # ------------------------------------------------------------------
+        # 3. Auto-calculate leave duration
+        # ------------------------------------------------------------------
+        duration_days = ser.validated_data.get('calculated_days')
+        if duration_days is None:
+            duration_days = (end - start).days + 1
+
+        # ------------------------------------------------------------------
+        # 4. Create LeaveRequest with correct routing
+        # ------------------------------------------------------------------
+        if route_direct_to_hr:
+            tl_user = None
+            initial_status = 'tl_approved'
+        else:
+            tl_user = actionable_tl
+            initial_status = 'applied'
+
         lr = models.LeaveRequest.objects.create(
             profile=prof,
-            leave_type=ser.validated_data['leave_type'],
+            leave_type=ser.validated_data['normalized_leave_type'],
             start_date=start,
             end_date=end,
             days=duration_days,
             reason=ser.validated_data.get('reason', ''),
-            tl=prof.team_lead
+            status=initial_status,
+            tl=tl_user,
         )
 
-       
-        tl_user = prof.team_lead
-        if tl_user:
+        # ------------------------------------------------------------------
+        # 5. Notify actionable TL (NOT always primary TL)
+        # ------------------------------------------------------------------
+        if not route_direct_to_hr and actionable_tl:
             models.Notification.objects.create(
-                to_user=tl_user,
+                to_user=actionable_tl,
                 title=f"Leave request from {prof.full_name()}",
-                body=f"{prof.full_name()} applied for {lr.leave_type} from {lr.start_date} to {lr.end_date}.",
+                body=f"{prof.full_name()} applied for {lr.leave_type} "
+                f"from {lr.start_date} to {lr.end_date}.",
                 notif_type='leave',
                 extra={'leave_request_id': lr.id}
             )
 
+        # ------------------------------------------------------------------
+        # 6. Response
+        # ------------------------------------------------------------------
         return Response({
             "id": lr.id,
             "name": prof.full_name(),
@@ -365,11 +432,14 @@ class HRTLActionAPIView(APIView):
         user = request.user
 
         # TL actions
-        if getattr(user, 'role', None) == 'tl':
+        if user.role == 'tl':
+            # TL cannot act on their own request
+            if lr.profile.user == user:
+                return Response({'detail': 'TL cannot approve their own leave.'}, status=403)
             # TL can act only on fresh applied requests
             if lr.status != 'applied':
                 return Response({'detail': 'TL can only act on requests with status "applied".'}, status=400)
-            
+
             if lr.profile.team_lead != user:
                 return Response({'detail': 'Forbidden'}, status=403)
 

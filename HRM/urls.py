@@ -1,4 +1,5 @@
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from emp.views_protected_media import protected_employee_media
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -11,8 +12,7 @@ urlpatterns = [
     path('api/', include('tl.urls')),
     path('api/', include('login.urls')),
     path('api/', include('management.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
+]
 
 urlpatterns += [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
@@ -20,4 +20,10 @@ urlpatterns += [
          SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/schema/redoc/',
          SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path("api/media/employee/<int:pk>/<str:field_name>/",
+         protected_employee_media, name="protected_employee_media"),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL,
+                          document_root=settings.MEDIA_ROOT)

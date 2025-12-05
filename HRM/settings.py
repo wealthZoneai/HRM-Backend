@@ -11,11 +11,10 @@ SECRET_KEY = os.environ.get(
     "SECRET_KEY", "django-insecure-ii-#!%hvxy_3rcdes57n&x+oak$&b1u22r&)%z!=%fy0-6g!h@")
 
 
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+DEBUG = False
 
 
-ALLOWED_HOSTS = os.environ.get(
-    "ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = []
 
 
 INSTALLED_APPS = [
@@ -29,6 +28,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
+    "rest_framework_simplejwt.token_blacklist",
     'drf_spectacular',
     'corsheaders',
 
@@ -167,10 +167,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
-# PRODUCTION EXAMPLE (uncomment when needed)
-# CORS_ALLOWED_ORIGINS = [
-#     "https://yourapp.onrender.com",
-# ]
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # dev mode
 

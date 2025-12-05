@@ -130,6 +130,22 @@ class EmployeeProfile(models.Model):
     def __str__(self):
         return f"{self.full_name()} ({self.emp_id})"
 
+    def is_on_leave(self, start, end):
+        """
+        Returns True if this employee has any leave overlapping start..end.
+        We exclude rejected leaves.
+        """
+        from .models import LeaveRequest
+
+        return LeaveRequest.objects.filter(
+            profile=self,
+        ).exclude(
+            status__in=['tl_rejected', 'hr_rejected', 'rejected']
+        ).filter(
+            start_date__lte=end,
+            end_date__gte=start
+        ).exists()
+
     class Meta:
         ordering = ['-created_at']
 

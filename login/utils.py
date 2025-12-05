@@ -1,9 +1,9 @@
-import random
+import secrets
 from django.core.mail import send_mail
 from django.conf import settings
 
 def generate_otp():
-    return str(random.randint(1000, 9999))  # 4-digit OTP
+    return f"{secrets.randbelow(10**6):06d}"
 
 def send_otp_email(email, otp):
     subject = "Password Reset OTP - HRMS Portal"
