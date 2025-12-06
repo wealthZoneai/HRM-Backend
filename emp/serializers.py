@@ -233,38 +233,6 @@ class EmployeeCreateSerializer(serializers.Serializer):
 class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
 
-    class Meta:
-        model = EmployeeProfile
-        fields = (
-            'user', 'emp_id', 'work_email', 'first_name', 'middle_name', 'last_name',
-            'personal_email', 'phone_number', 'alternate_number', 'dob', 'blood_group',
-            'gender', 'marital_status',
-            'job_title', 'department', 'team_lead', 'employment_type', 'start_date',
-            'location', 'job_description', 'id_image', 'profile_photo',
-            'bank_name', 'ifsc_code', 'masked_account_number', 'branch',
-            'masked_aadhaar', 'aadhaar_image', 'masked_pan', 'pan_image', 'masked_passport', 'passport_image',
-            'role', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('emp_id', 'work_email', 'user',
-                            'created_at', 'updated_at')
-
-        def mask_number(self, value):
-            if not value:
-                return value
-            return "*" * (len(value) - 4) + value[-4:]
-
-        def get_masked_aadhaar(self, obj):
-            return self.mask_number(obj.aadhaar_number)
-
-        def get_masked_pan(self, obj):
-            return self.mask_number(obj.pan)
-
-        def get_masked_passport(self, obj):
-            return self.mask_number(obj.passport_number)
-
-        def get_masked_account_number(self, obj):
-            return self.mask_number(obj.account_number)
-
     masked_aadhaar = serializers.SerializerMethodField()
     masked_pan = serializers.SerializerMethodField()
     masked_passport = serializers.SerializerMethodField()
@@ -276,11 +244,30 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     protected_passport_image_url = serializers.SerializerMethodField()
     protected_id_image_url = serializers.SerializerMethodField()
 
+    def mask_number(self, value):
+            if not value:
+                return value
+            return "*" * (len(value) - 4) + value[-4:]
+
+    def get_masked_aadhaar(self, obj):
+        return self.mask_number(obj.aadhaar_number)
+
+    def get_masked_pan(self, obj):
+        return self.mask_number(obj.pan)
+
+    def get_masked_passport(self, obj):
+        return self.mask_number(obj.passport_number)
+
+    def get_masked_account_number(self, obj):
+        return self.mask_number(obj.account_number)
+
+
+
     def get_protected_profile_photo_url(self, obj):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                          args=[obj.pk, "profile_photo"])
+                        args=[obj.pk, "profile_photo"])
         except Exception:
             return None
         if request:
@@ -292,7 +279,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                          args=[obj.pk, "aadhaar_image"])
+                        args=[obj.pk, "aadhaar_image"])
         except Exception:
             return None
         if request:
@@ -303,7 +290,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                          args=[obj.pk, "pan_image"])
+                        args=[obj.pk, "pan_image"])
         except Exception:
             return None
         if request:
@@ -314,7 +301,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                          args=[obj.pk, "passport_image"])
+                        args=[obj.pk, "passport_image"])
         except Exception:
             return None
         if request:
@@ -325,7 +312,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                          args=[obj.pk, "id_image"])
+                        args=[obj.pk, "id_image"])
         except Exception:
             return None
         if request:
@@ -333,14 +320,32 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         return url
 
     def get_user(self, obj):
-        return {
-            "id": obj.user.id,
-            "username": obj.user.username,
-            "first_name": obj.user.first_name,
-            "last_name": obj.user.last_name,
-            "email": obj.user.email,
-            "role": obj.user.role,
-        }
+            return {
+                "id": obj.user.id,
+                "username": obj.user.username,
+                "first_name": obj.user.first_name,
+                "last_name": obj.user.last_name,
+                "email": obj.user.email,
+                "role": obj.user.role,
+            }
+
+    class Meta:
+        model = EmployeeProfile
+        fields = (
+            'user', 'emp_id', 'work_email', 'first_name', 'middle_name', 'last_name',
+            'personal_email', 'phone_number', 'alternate_number', 'dob', 'blood_group',
+            'gender', 'marital_status',
+            'job_title', 'department', 'team_lead', 'employment_type', 'start_date',
+            'location', 'job_description', 'protected_id_image_url', 'protected_profile_photo_url',
+            'bank_name', 'ifsc_code', 'masked_account_number', 'branch',
+            'masked_aadhaar', 'protected_aadhaar_image_url', 'masked_pan', 'protected_pan_image_url', 'masked_passport', 'protected_passport_image_url',
+            'role', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('emp_id', 'work_email', 'user',
+                            'created_at', 'updated_at')
+
+        
+
 
 
 class EmployeeContactUpdateSerializer(serializers.ModelSerializer):
