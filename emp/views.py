@@ -263,7 +263,7 @@ class LeaveApplyAPIView(APIView):
         end = ser.validated_data['end_date']
 
         # ------------------------------------------------------------------
-        # 1. If the applicant is a TL → skip TL approval, send to HR
+        # 1. If the applicant is a TL → route to HR directly
         # ------------------------------------------------------------------
         if request.user.role == 'tl':
             route_direct_to_hr = True
@@ -273,28 +273,31 @@ class LeaveApplyAPIView(APIView):
             actionable_tl = None
 
         # ------------------------------------------------------------------
-        # 2. Employee case → Select actionable TL
+        # 2. Employee case → Select actionable TL (if any)
         # ------------------------------------------------------------------
         if not route_direct_to_hr:
-            primary_tl = prof.team_lead
+            primary_tl = getattr(prof, 'team_lead', None)
+            if primary_tl and not getattr(primary_tl, 'is_active', True):
+                primary_tl = None
             actionable_tl = primary_tl
 
-            # CASE 1: No TL assigned → go directly to HR
             if not primary_tl:
+                # no assigned TL -> route to HR
                 route_direct_to_hr = True
             else:
-                # CASE 2: TL exists → check if TL is on leave
+                # TL exists -> check if TL is on leave
                 tl_profile = getattr(primary_tl, 'employeeprofile', None)
-
                 if tl_profile and tl_profile.is_on_leave(start, end):
-                    # TL unavailable → find backup TL from same department
+                    # TL unavailable -> find backup TL from same department
                     fallback_tls = (
                         get_user_model()
                         .objects.filter(
                             role='tl',
-                            employeeprofile__department=prof.department
+                            employeeprofile__department=prof.department,
+                            is_active=True
                         )
                         .exclude(id=primary_tl.id)
+                        .select_related('employeeprofile')
                     )
 
                     found_replacement = False
@@ -304,7 +307,6 @@ class LeaveApplyAPIView(APIView):
                             found_replacement = True
                             break
 
-                    # CASE 3: No replacement TL → escalate to HR
                     if not found_replacement:
                         route_direct_to_hr = True
 
@@ -320,7 +322,7 @@ class LeaveApplyAPIView(APIView):
         # ------------------------------------------------------------------
         if route_direct_to_hr:
             tl_user = None
-            initial_status = 'tl_approved'
+            initial_status = 'pending_hr'   # <-- NEW: explicitly pending HR
         else:
             tl_user = actionable_tl
             initial_status = 'applied'
@@ -337,7 +339,7 @@ class LeaveApplyAPIView(APIView):
         )
 
         # ------------------------------------------------------------------
-        # 5. Notify actionable TL (NOT always primary TL)
+        # 5. Notify actionable TL OR notify HR if pending_hr
         # ------------------------------------------------------------------
         if not route_direct_to_hr and actionable_tl:
             models.Notification.objects.create(
@@ -348,6 +350,19 @@ class LeaveApplyAPIView(APIView):
                 notif_type='leave',
                 extra={'leave_request_id': lr.id}
             )
+        else:
+            # pending HR: notify all HR and management users
+            hr_users = User.objects.filter(
+                role__in=['hr', 'management'], is_active=True)
+            for hr_user in hr_users:
+                models.Notification.objects.create(
+                    to_user=hr_user,
+                    title=f"Leave request pending HR: {prof.full_name()}",
+                    body=f"{prof.full_name()} applied for {lr.leave_type} "
+                    f"from {lr.start_date} to {lr.end_date}. Please review.",
+                    notif_type='leave',
+                    extra={'leave_request_id': lr.id}
+                )
 
         # ------------------------------------------------------------------
         # 6. Response
@@ -468,9 +483,9 @@ class HRTLActionAPIView(APIView):
 
         # HR actions
         if getattr(user, 'role', None) in ('hr', 'management'):
-            # HR should only act on requests that have TL approved (or direct applications depending on policy)
-            if lr.status != 'tl_approved':
-                return Response({'detail': 'HR can only act on requests approved by TL.'}, status=400)
+            # HR should act on requests that have TL approved OR pending HR
+            if lr.status not in ('tl_approved', 'pending_hr'):
+                return Response({'detail': 'HR can only act on requests that are approved by TL or routed to HR.'}, status=400)
 
             if action == 'approve':
                 lr.apply_hr_approval(user, approve=True, remarks=remarks)
@@ -478,11 +493,10 @@ class HRTLActionAPIView(APIView):
                 try:
                     lb = models.LeaveBalance.objects.get(
                         profile=lr.profile, leave_type__name=lr.leave_type)
-                    # if LeaveBalance model still uses FK LeaveType, this block may not match; we try a safe approach:
                     lb.used = lb.used + lr.days
                     lb.save()
                 except Exception:
-                    # if no matching balance or LeaveType model not used, ignore silently
+                    # ignore if no matching balance
                     pass
 
                 models.Notification.objects.create(

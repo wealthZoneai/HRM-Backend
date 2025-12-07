@@ -1,9 +1,8 @@
 {
   "info": {
-    "name": "HRMS Advanced API Collection",
+    "name": "HRMS Advanced API Collection - 07/12/2025",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "event": [],
   "variable": [
     {
       "key": "base_url",
@@ -16,6 +15,18 @@
     {
       "key": "refresh_token",
       "value": ""
+    },
+    {
+      "key": "team_lead_user_id",
+      "value": ""
+    },
+    {
+      "key": "employee_profile_id",
+      "value": ""
+    },
+    {
+      "key": "leave_id",
+      "value": ""
     }
   ],
   "item": [
@@ -23,7 +34,7 @@
       "name": "Authentication",
       "item": [
         {
-          "name": "Login (Auto Capture Token)",
+          "name": "Login",
           "request": {
             "method": "POST",
             "header": [
@@ -75,8 +86,7 @@
               "mode": "raw",
               "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
             }
-          },
-          "event": []
+          }
         },
         {
           "name": "Forgot Password",
@@ -168,8 +178,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "my-profile"]
             }
-          },
-          "event": []
+          }
         },
         {
           "name": "Update Contact",
@@ -247,8 +256,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "attendance", "clock-in"]
             }
-          },
-          "event": []
+          }
         },
         {
           "name": "Clock Out",
@@ -269,8 +277,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "attendance", "clock-out"]
             }
-          },
-          "event": []
+          }
         },
         {
           "name": "My Attendance Days",
@@ -364,33 +371,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"leave_type_id\": 1,\n  \"start_date\": \"\",\n  \"end_date\": \"\",\n  \"days\": \"\",\n  \"reason\": \"\"\n}"
-            }
-          },
-          "event": []
-        },
-        {
-          "name": "TL/HR Leave Action",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/action/leave/<leave_id>/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "action", "leave", "<leave_id>"]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"action\": \"approve\",\n  \"remarks\": \"\"\n}"
+              "raw": "{\n  \"leave_type\": \"\",\n  \"start_date\": \"\",\n  \"end_date\": \"\",\n  \"reason\": \"\"\n}"
             }
           },
           "event": []
@@ -531,10 +512,6 @@
             "method": "POST",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
               }
@@ -544,12 +521,61 @@
               "host": ["{{base_url}}"],
               "path": ["api", "hr", "create-employee"]
             },
-            "body": {
+            "body_": {
               "mode": "raw",
-              "raw": "{\n  \"first_name\": \"\",\n  \"last_name\": \"\",\n  \"role\": \"\",\n  \"emp_id\": \"\",\n  \"work_email\": \"\"\n}"
+              "raw": "{\n  \"contact\": {\n    \"first_name\": \"\",\n    \"last_name\": \"\",\n    \"personal_email\": \"@gmail.com\",\n    \"phone_number\": \"\",\n    \"dob\": \"\",\n    \"gender\": \"\"\n  },\n  \"job\": {\n    \"job_title\": \"\",\n    \"department\": \"\",\n    \"team_lead\": \"{{team_lead_user_id}}\",\n    \"employment_type\": \"\",\n    \"start_date\": \"\"\n  },\n  \"bank\": {\n    \"bank_name\": \"DBS\",\n    \"ifsc_code\": \"DBS0001\",\n    \"account_number\": \"123456\",\n    \"confirm_account_number\": \"123456\",\n    \"branch\": \"Hyderabad\"\n  }\n}"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "role",
+                  "value": "employee",
+                  "type": "text"
+                },
+                {
+                  "key": "contact",
+                  "value": "{\n \"first_name\": \"\",\n \"last_name\": \"\",\n \"personal_email\": \"@gmail.com\",\n \"phone_number\": \"\",\n \"dob\": \"\",\n \"gender\": \"\"\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "job",
+                  "value": "{\n \"job_title\": \" \",\n \"department\": \"\",\n \"team_lead\": \"{{team_lead_user_id}}\",\n \"employment_type\": \"\",\n \"start_date\": \"\"\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "bank",
+                  "value": "{\n \"bank_name\": \"DBS\",\n \"ifsc_code\": \"DBS0001\",\n \"account_number\": \"123456\",\n \"confirm_account_number\": \"123456\",\n \"branch\": \"Hyderabad\"\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_photo",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "id_image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "aadhaar_image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "pan_image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "passport_image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
             }
-          },
-          "event": []
+          }
         },
         {
           "name": "Employees List",
@@ -574,7 +600,7 @@
           "event": []
         },
         {
-          "name": "Employee Detail",
+          "name": "Get Employee Details",
           "request": {
             "method": "GET",
             "header": [
@@ -588,17 +614,17 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/employees/1/",
+              "raw": "{{base_url}}/api/hr/employees/{{employee_profile_id}}/",
               "host": ["{{base_url}}"],
-              "path": ["api", "employees", "1"]
+              "path": ["api", "hr", "employees", "{{employee_profile_id}}"]
             }
           },
           "event": []
         },
         {
-          "name": "Update JobBank",
+          "name": "Update Job Details",
           "request": {
-            "method": "PATCH",
+            "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
@@ -610,13 +636,19 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/employees/1/jobbank/",
+              "raw": "{{base_url}}/api/hr/employees/{{employee_profile_id}}/jobbank/",
               "host": ["{{base_url}}"],
-              "path": ["api", "employees", "1", "jobbank"]
+              "path": [
+                "api",
+                "hr",
+                "employees",
+                "{{employee_profile_id}}",
+                "jobbank"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"job_role\": \"\",\n  \"department\": \"\"\n}"
+              "raw": "{\n \"job_title\": \"\",\n \"department\": \"\",\n \"team_lead\": \"{{team_lead_user_id}}\",\n \"employment_type\": \"\",\n \"start_date\": \"\"\n}"
             }
           },
           "event": []
@@ -906,7 +938,7 @@
           "event": []
         },
         {
-          "name": "HR Leave Action",
+          "name": "HR Leave Action (Approve/Reject)",
           "request": {
             "method": "POST",
             "header": [
@@ -920,13 +952,13 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/leaves/1/action/",
+              "raw": "{{base_url}}/api/hr/leaves/{{leave_id}}/action/",
               "host": ["{{base_url}}"],
-              "path": ["api", "leaves", "1", "action"]
+              "path": ["api", "hr", "leaves", "{{leave_id}}", "action"]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"action\": \"approve\",\n  \"remarks\": \"\"\n}"
+              "raw": "{\n  \"action\": \"approve\",\n  \"remarks\": \"Approved by HR\"\n}"
             }
           },
           "event": []
@@ -979,6 +1011,76 @@
             }
           },
           "event": []
+        },
+        {
+          "name": "TL Pending Leaves",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tl/leave/pending/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tl", "leave", "pending"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"remarks\": \"Reviewed by TL\"\n}"
+            }
+          },
+          "event": []
+        },
+        {
+          "name": "TL Leave Action (Approve/Reject)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tl/leave/{{leave_id}}/action/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tl", "leave", "{{leave_id}}", "action"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"remarks\": \"Reviewed by TL\"\n}"
+            }
+          },
+          "event": []
+        },
+        {
+          "name": "TL List (By Department)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tl/list/?department=Python",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tl", "list"],
+              "query": [{ "key": "department", "value": "Python" }]
+            }
+          }
         }
       ]
     }

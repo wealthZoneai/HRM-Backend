@@ -26,7 +26,20 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('emp_id','work_email','username','created_at','user')
 
+class FlexibleTeamLeadField(serializers.PrimaryKeyRelatedField):
+    def to_internal_value(self, data):
+        # accept int id
+        if isinstance(data, int) or (isinstance(data, str) and data.isdigit()):
+            return super().to_internal_value(int(data))
+        # accept username or email
+        User = get_user_model()
+        u = User.objects.filter(username__iexact=data).first() or User.objects.filter(email__iexact=data).first()
+        if u:
+            return u
+        self.fail('does_not_exist', pk_value=data)
+
 class EmployeeJobBankUpdateSerializer(serializers.ModelSerializer):
+    team_lead = FlexibleTeamLeadField(queryset=User.objects.filter(role='tl'), required=False, allow_null=True)
     class Meta:
         model = EmployeeProfile
         fields = ('job_title','department','team_lead','employment_type','start_date','location','job_description',
@@ -85,3 +98,4 @@ class LeaveRequestAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveRequest
         fields = '__all__'
+

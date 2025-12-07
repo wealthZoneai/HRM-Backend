@@ -1,6 +1,6 @@
 # emp/serializers.py
 from rest_framework import serializers
-
+from rest_framework.exceptions import ValidationError
 from login import models
 from .models import (
     EmployeeProfile, Notification, Shift, Attendance, CalendarEvent,
@@ -79,37 +79,90 @@ class IdentificationSerializer(serializers.Serializer):
 
 class EmployeeCreateSerializer(serializers.Serializer):
     # minimal user info (keeps backward compatibility)
-    role = serializers.ChoiceField(choices=[('employee', 'Employee'), ('intern', 'Intern'), (
-        'tl', 'Team Leader'), ('hr', 'HR'), ('management', 'Management')], default='employee')
+    role = serializers.ChoiceField(
+        choices=[
+            ('employee', 'Employee'),
+            ('intern', 'Intern'),
+            ('tl', 'Team Leader'),
+            ('hr', 'HR'),
+            ('management', 'Management')
+        ],
+        default='employee'
+    )
     emp_id = serializers.CharField(
         required=False, allow_blank=True, max_length=50)
     work_email = serializers.EmailField(required=False, allow_blank=True)
 
-    # nested sections (required/optional as per your spec)
+    # nested sections
     contact = ContactSerializer(required=True)
     job = JobSerializer(required=True)
     bank = BankSerializer(required=True)
     identification = IdentificationSerializer(required=False)
 
+    # ----------------------------------------------------------------------
+    # FIELD-LEVEL VALIDATION
+    # ----------------------------------------------------------------------
     def validate_work_email(self, value):
         if value and User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(
                 "User with this email already exists.")
         return value
 
+    # ----------------------------------------------------------------------
+    # OBJECT-LEVEL VALIDATION (TEAM LEAD OPTIONAL BUT MUST BE VALID IF PROVIDED)
+    # ----------------------------------------------------------------------
+    def validate(self, data):
+        """
+        Validate job.team_lead only if provided.
+        TL is optional in employee creation. If provided, it must resolve to a valid User.
+        """
+        job = data.get('job', {}) or {}
+        tl_val = job.get('team_lead')
+
+        # TL is optional → allow employee creation without assigning TL
+        if not tl_val:
+            return data
+
+        # Try resolving TL to a user
+        try:
+            if str(tl_val).isdigit():
+                user = User.objects.filter(id=int(tl_val)).first()
+            else:
+                user = (
+                    User.objects.filter(username__iexact=tl_val).first()
+                    or User.objects.filter(email__iexact=tl_val).first()
+                )
+        except Exception:
+            user = None
+
+        # If TL value exists but cannot be resolved → throw error
+        if not user:
+            raise ValidationError({
+                "job": {
+                    "team_lead": "Invalid team_lead: user not found (provide user id, username or email)."
+                }
+            })
+
+        # Normalize TL value → replace provided value with the resolved user.id
+        data.setdefault('job', {})['team_lead'] = user.id
+        return data
+
+    # ----------------------------------------------------------------------
+    # CREATE LOGIC
+    # ----------------------------------------------------------------------
     def create(self, validated_data):
-        # extract nested parts
         contact = validated_data.get('contact', {})
         job = validated_data.get('job', {})
         bank = validated_data.get('bank', {})
         identification = validated_data.get('identification', {})
 
+        # basic info
         first_name = (contact.get('first_name') or '').strip()
         last_name = (contact.get('last_name') or '').strip()
         role = validated_data.get('role', 'employee')
         email = (validated_data.get('work_email') or '').strip() or None
 
-        # username generation (same approach as your existing create_user flow)
+        # username generation
         base_username = f"{first_name.lower()}.{last_name.lower()}" if first_name or last_name else "user"
         username = base_username
         counter = 1
@@ -117,22 +170,31 @@ class EmployeeCreateSerializer(serializers.Serializer):
             username = f"{base_username}{counter}"
             counter += 1
 
+        # create User
         user = User.objects.create_user(
-            username=username, password=None, first_name=first_name, last_name=last_name, email=email, role=role
+            username=username,
+            password=None,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            role=role
         )
         user.set_unusable_password()
         user.save()
 
-        # ensure EmployeeProfile exists via signals (but update with provided fields)
-        prof, created = EmployeeProfile.objects.get_or_create(user=user, defaults={
-            'emp_id': validated_data.get('emp_id') or '',
-            'work_email': email or '',
-            'first_name': first_name or '',
-            'last_name': last_name or '',
-            'role': role
-        })
+        # create/get EmployeeProfile
+        prof, created = EmployeeProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'emp_id': validated_data.get('emp_id') or '',
+                'work_email': email or '',
+                'first_name': first_name or '',
+                'last_name': last_name or '',
+                'role': role
+            }
+        )
 
-        # update emp_id if provided
+        # update fields
         if validated_data.get('emp_id'):
             prof.emp_id = validated_data.get('emp_id')
 
@@ -150,32 +212,17 @@ class EmployeeCreateSerializer(serializers.Serializer):
         prof.gender = contact.get('gender') or prof.gender
         prof.marital_status = contact.get(
             'marital_status') or prof.marital_status
-        # profile_photo may be an InMemoryUploadedFile
         if contact.get('profile_photo') is not None:
             prof.profile_photo = contact.get('profile_photo')
 
         # JOB
         prof.job_title = job.get('job_title') or prof.job_title
         prof.department = job.get('department')
+
+        # team_lead already normalized in validate() → always integer id if provided
         tl_val = job.get('team_lead')
         if tl_val:
-            # If numeric, keep old behavior (backwards compatibility)
-            try:
-                if str(tl_val).isdigit():
-                    prof.team_lead_id = int(tl_val)
-                else:
-                    # Accept username or email (frontend should send username or email)
-                    try:
-                        # try username first
-                        u = User.objects.get(username=tl_val)
-                    except User.DoesNotExist:
-                        # fallback to email lookup (case-insensitive)
-                        u = User.objects.filter(email__iexact=tl_val).first()
-                    if u:
-                        prof.team_lead = u
-            except Exception:
-                # ignore invalid values (or log if you want)
-                pass
+            prof.team_lead_id = int(tl_val)
 
         prof.employment_type = job.get(
             'employment_type') or prof.employment_type
@@ -205,11 +252,11 @@ class EmployeeCreateSerializer(serializers.Serializer):
         if identification.get('passport_image') is not None:
             prof.passport_image = identification.get('passport_image')
 
-        # work_email update if provided
+        # work_email
         if email:
             prof.work_email = email
 
-        # Save only changed fields for minimal impact
+        # save minimal fields
         update_fields = [
             'emp_id', 'work_email', 'first_name', 'middle_name', 'last_name',
             'personal_email', 'phone_number', 'alternate_number', 'dob',
@@ -220,7 +267,6 @@ class EmployeeCreateSerializer(serializers.Serializer):
             'aadhaar_number', 'aadhaar_image', 'pan', 'pan_image',
             'passport_number', 'passport_image', 'profile_photo'
         ]
-        # filter only existing fields on model to avoid errors
         valid_update_fields = [f for f in update_fields if hasattr(prof, f)]
         prof.save(update_fields=valid_update_fields)
 
@@ -244,10 +290,13 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     protected_passport_image_url = serializers.SerializerMethodField()
     protected_id_image_url = serializers.SerializerMethodField()
 
+    team_lead = serializers.SerializerMethodField()
+    team_lead_id = serializers.SerializerMethodField()
+
     def mask_number(self, value):
-            if not value:
-                return value
-            return "*" * (len(value) - 4) + value[-4:]
+        if not value:
+            return value
+        return "*" * (len(value) - 4) + value[-4:]
 
     def get_masked_aadhaar(self, obj):
         return self.mask_number(obj.aadhaar_number)
@@ -261,13 +310,11 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     def get_masked_account_number(self, obj):
         return self.mask_number(obj.account_number)
 
-
-
     def get_protected_profile_photo_url(self, obj):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                        args=[obj.pk, "profile_photo"])
+                          args=[obj.pk, "profile_photo"])
         except Exception:
             return None
         if request:
@@ -279,7 +326,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                        args=[obj.pk, "aadhaar_image"])
+                          args=[obj.pk, "aadhaar_image"])
         except Exception:
             return None
         if request:
@@ -290,7 +337,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                        args=[obj.pk, "pan_image"])
+                          args=[obj.pk, "pan_image"])
         except Exception:
             return None
         if request:
@@ -301,7 +348,7 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                        args=[obj.pk, "passport_image"])
+                          args=[obj.pk, "passport_image"])
         except Exception:
             return None
         if request:
@@ -312,22 +359,37 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
-                        args=[obj.pk, "id_image"])
+                          args=[obj.pk, "id_image"])
         except Exception:
             return None
         if request:
             return request.build_absolute_uri(url)
         return url
 
-    def get_user(self, obj):
+    def get_team_lead(self, obj):
+        if obj.team_lead:
             return {
-                "id": obj.user.id,
-                "username": obj.user.username,
-                "first_name": obj.user.first_name,
-                "last_name": obj.user.last_name,
-                "email": obj.user.email,
-                "role": obj.user.role,
+                "id": obj.team_lead.id,
+                "username": obj.team_lead.username,
+                "first_name": obj.team_lead.first_name,
+                "last_name": obj.team_lead.last_name,
+                "email": obj.team_lead.email,
+                "display": obj.team_lead.first_name + ' ' + obj.team_lead.last_name if (obj.team_lead.first_name or obj.team_lead.last_name) else obj.team_lead.username
             }
+        return None
+
+    def get_team_lead_id(self, obj):
+        return obj.team_lead.id if obj.team_lead else None
+
+    def get_user(self, obj):
+        return {
+            "id": obj.user.id,
+            "username": obj.user.username,
+            "first_name": obj.user.first_name,
+            "last_name": obj.user.last_name,
+            "email": obj.user.email,
+            "role": obj.user.role,
+        }
 
     class Meta:
         model = EmployeeProfile
@@ -335,17 +397,14 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
             'user', 'emp_id', 'work_email', 'first_name', 'middle_name', 'last_name',
             'personal_email', 'phone_number', 'alternate_number', 'dob', 'blood_group',
             'gender', 'marital_status',
-            'job_title', 'department', 'team_lead', 'employment_type', 'start_date',
+            'job_title', 'department', 'team_lead', 'team_lead_id', 'employment_type', 'start_date',
             'location', 'job_description', 'protected_id_image_url', 'protected_profile_photo_url',
             'bank_name', 'ifsc_code', 'masked_account_number', 'branch',
             'masked_aadhaar', 'protected_aadhaar_image_url', 'masked_pan', 'protected_pan_image_url', 'masked_passport', 'protected_passport_image_url',
             'role', 'created_at', 'updated_at'
         )
-        read_only_fields = ('emp_id', 'work_email', 'user',
+        read_only_fields = ('emp_id', 'work_email', 'user', 'team_lead', 'team_lead_id',
                             'created_at', 'updated_at')
-
-        
-
 
 
 class EmployeeContactUpdateSerializer(serializers.ModelSerializer):
