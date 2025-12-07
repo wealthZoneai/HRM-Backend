@@ -31,7 +31,12 @@ class IsTLorHRorOwner(permissions.BasePermission):
             try:
                 profile = getattr(obj, 'profile', None) or obj
                 owner_user = getattr(profile, 'user', None)
-                return owner_user and getattr(owner_user.employeeprofile, 'team_lead', None) == user
+                if not owner_user:
+                    return False
+                tl_user = getattr(owner_user.employeeprofile,
+                                  'team_lead', None)
+                # compare by id
+                return getattr(tl_user, 'id', None) == getattr(user, 'id', None)
             except Exception:
                 return False
         # owner fallback

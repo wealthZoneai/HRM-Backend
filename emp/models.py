@@ -14,8 +14,6 @@ class EmployeeProfile(models.Model):
 
     # System fields
     emp_id = models.CharField(max_length=20, unique=True)
-    team_lead = models.CharField(max_length=150, null=True, blank=True,
-                                 help_text="Team Lead username or name (stored as text).")
     work_email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, null=True, blank=True)
 
@@ -100,6 +98,10 @@ class EmployeeProfile(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='assigned_employees'
     )
+    def team_lead_display(self):
+        if self.team_lead:
+            return f"{self.team_lead.first_name} {self.team_lead.last_name}".strip() or self.team_lead.username
+        return None
 
     employment_type = models.CharField(max_length=50, null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -370,6 +372,7 @@ class LeaveRequest(models.Model):
         ('tl_rejected', 'TL Rejected'),
         ('hr_approved', 'HR Approved'),
         ('hr_rejected', 'HR Rejected'),
+        ('pending_hr', 'Pending HR'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
     ]
