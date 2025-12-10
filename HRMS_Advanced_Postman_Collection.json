@@ -1083,6 +1083,55 @@
           }
         }
       ]
+    },
+    {
+      "name": "Policies",
+      "item": [
+        {
+          "name": "HR Add Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/policy/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policy"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policy_type\": \"\",\n  \"title\": \"\",\n  \"description\": \"\"\n}"
+            }
+          },
+          "event": []
+        },
+        {
+          "name": "View Policy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/policy/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policy"]
+            }
+          },
+          "event": []
+        }
+      ]
     }
   ]
 }

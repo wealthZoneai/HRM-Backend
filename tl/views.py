@@ -138,7 +138,7 @@ class TLDashboardAPIView(APIView):
 
         total_present = attendance_qs.count()
         total_hours = attendance_qs.aggregate(
-            total=Sum("duration_seconds"))["total"] or 0
+            total=Sum("duration_time"))["total"] or 0
 
         # Upcoming meetings
         meetings = CalendarEvent.objects.filter(

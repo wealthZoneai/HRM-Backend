@@ -182,6 +182,7 @@ MEDIA_ROOT = BASE_DIR / "media/"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
+APPEND_SLASH = False
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # dev mode

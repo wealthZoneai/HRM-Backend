@@ -42,7 +42,7 @@ class JobSerializer(serializers.Serializer):
     team_lead = serializers.CharField(
         required=False, allow_blank=True, allow_null=True)
     employment_type = serializers.ChoiceField(choices=[(
-        'full_time', 'Full Time'), ('contract', 'Contract'), ('intern', 'Intern')], required=True)
+        'full_time', 'Full Time'), ('contract', 'Contract')], required=True)
     start_date = serializers.DateField(required=True)
     location = serializers.CharField(
         required=False, allow_blank=True, max_length=200)
@@ -140,6 +140,13 @@ class EmployeeCreateSerializer(serializers.Serializer):
             raise ValidationError({
                 "job": {
                     "team_lead": "Invalid team_lead: user not found (provide user id, username or email)."
+                }
+            })
+
+        if user.role != 'tl':
+            raise ValidationError({
+                "job": {
+                    "team_lead": f"Invalid selection: '{user.username}' is not a Team Lead."
                 }
             })
 
@@ -443,8 +450,7 @@ class ShiftSerializer(serializers.ModelSerializer):
 class AttendanceReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
-        fields = ('id', 'date', 'shift', 'clock_in', 'clock_out', 'duration_seconds', 'status',
-                  'is_remote', 'late_by_seconds', 'overtime_seconds', 'note', 'manual_entry')
+        fields = '__all__'
 
 
 # Calendar

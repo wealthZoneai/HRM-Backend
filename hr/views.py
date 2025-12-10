@@ -149,7 +149,7 @@ class HRGeneratePayslipAPIView(APIView):
             user=profile.user, date__year=year, date__month=month, status='completed')
         days_present = attend_qs.count()
         total_seconds = attend_qs.aggregate(
-            total=Sum('duration_seconds'))['total'] or 0
+            total=Sum('duration_time'))['total'] or 0
         overtime_seconds = attend_qs.aggregate(
             total=Sum('overtime_seconds'))['total'] or 0
 

@@ -14,7 +14,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(models.Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ('user','date','clock_in','clock_out','duration_seconds','status')
+    list_display = ('user','date','clock_in','clock_out','duration_time','status')
     list_filter = ('status','date')
 
 @admin.register(models.Shift)

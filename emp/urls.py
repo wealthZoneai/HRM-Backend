@@ -44,6 +44,11 @@ urlpatterns = [
          name='my-leave-requests'),
     path('leave/apply/', views.LeaveApplyAPIView.as_view(), name='leave-apply'),
 
+    # Policies
+    path('policy/', views.PolicyListCreateAPIView.as_view(),
+         name='policy-list-create'),
+    path('policy/<int:pk>/', views.PolicyRetrieveAPIView.as_view(),
+         name='policy-detail'),
     # HR support
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
          name='hr-create-employee'),
