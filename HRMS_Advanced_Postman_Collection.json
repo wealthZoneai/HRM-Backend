@@ -1171,6 +1171,10 @@
               "raw": "{{base_url}}/api/policy/<int:pk>/update-delete/",
               "host": ["{{base_url}}"],
               "path": ["api", "policy", "<int:pk>", "update-delete"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policy_type\": \"\",\n  \"title\": \"\",\n  \"description\": \"\"\n}"
             }
           },
           "event": []
