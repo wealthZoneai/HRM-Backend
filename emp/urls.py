@@ -47,10 +47,7 @@ urlpatterns = [
     # Policies
     path('policy/', views.PolicyListAPIView.as_view(), name='policy-list'),
     path('policy/create/', views.PolicyCreateAPIView.as_view(), name='policy-create'),
-    path('policy/<int:pk>/', views.PolicyRetrieveAPIView.as_view(),
-         name='policy-detail'),
-    path('policy/<int:pk>/update-delete/',
-         views.PolicyUpdateDeleteAPIView.as_view(), name='policy-update-delete'),
+    path('policy/<int:pk>/', views.PolicyUpdateDeleteAPIView.as_view(), name='policy-detail'),
 
     # HR support
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
