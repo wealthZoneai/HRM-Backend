@@ -45,10 +45,13 @@ urlpatterns = [
     path('leave/apply/', views.LeaveApplyAPIView.as_view(), name='leave-apply'),
 
     # Policies
-    path('policy/', views.PolicyListCreateAPIView.as_view(),
-         name='policy-list-create'),
+    path('policy/', views.PolicyListAPIView.as_view(), name='policy-list'),
+    path('policy/create/', views.PolicyCreateAPIView.as_view(), name='policy-create'),
     path('policy/<int:pk>/', views.PolicyRetrieveAPIView.as_view(),
          name='policy-detail'),
+    path('policy/<int:pk>/update-delete/',
+         views.PolicyUpdateDeleteAPIView.as_view(), name='policy-update-delete'),
+
     # HR support
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
          name='hr-create-employee'),

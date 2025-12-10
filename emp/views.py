@@ -520,25 +520,26 @@ class HRTLActionAPIView(APIView):
 
         return Response({'detail': 'Not allowed'}, status=403)
 
-class PolicyListCreateAPIView(generics.ListCreateAPIView):
-    """
-    GET: List all policies (any authenticated user can view)
-    POST: Create a new policy (only HR or management can create)
-    """
 
+
+class PolicyListAPIView(generics.ListAPIView):
     queryset = models.Policy.objects.all().order_by('-created_at')
     serializer_class = serializers.PolicySerializer
+    permission_classes = [IsAuthenticated]
 
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsHROrManagement()]
-        return [IsAuthenticated()]
+class PolicyCreateAPIView(generics.CreateAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+
     
 class PolicyRetrieveAPIView(generics.RetrieveAPIView):
-    """
-    GET: Retrieve a specific policy by ID (any authenticated user can view)
-    """
-
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsAuthenticated]
+
+class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+
