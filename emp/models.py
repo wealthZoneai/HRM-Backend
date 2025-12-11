@@ -442,4 +442,81 @@ class Policy(models.Model):
         ordering = ['-created_at']
 
 
+<<<<<<< HEAD
+# emp/models.py (append)
+
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+
+# note: EmployeeProfile is expected to exist in your project:
+# either in this app or accessible as settings.AUTH_USER_MODEL related object.
+# TimesheetDay stores per-day metadata (clock_in/clock_out).
+class TimesheetDay(models.Model):
+    profile = models.ForeignKey('EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_days')
+    date = models.DateField()
+    clock_in = models.DateTimeField(null=True, blank=True)
+    clock_out = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('profile', 'date')
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{getattr(self.profile, 'emp_id', self.profile.id)} - {self.date}"
+
+
+class TimesheetEntry(models.Model):
+    """
+    Task-level timesheet entry for a specific employee and date.
+    This implementation is self-contained and uses TimesheetDay for clock-in/out metadata.
+    """
+    profile = models.ForeignKey('EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_entries')
+    date = models.DateField()               # calendar date for the entry
+    day = models.CharField(max_length=20, blank=True)
+    task = models.CharField(max_length=250)
+    description = models.TextField(blank=True, null=True)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    duration_seconds = models.CharField(max_length=20,null=True, blank=True)
+    manual = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date', 'start_time']
+        unique_together = ('profile', 'date', 'start_time', 'end_time')
+
+    def clean(self):
+        # Basic sanity checks
+        if self.end_time <= self.start_time:
+            raise ValidationError("End time must be after start time.")
+        if self.start_time.date() != self.date or self.end_time.date() != self.date:
+            raise ValidationError("Start and end must be on the same date as the 'date' field.")
+        # Max duration guard
+        if (self.end_time - self.start_time).total_seconds() > 6 * 3600:
+            raise ValidationError("Single task duration should not exceed 6 hours. Split into smaller tasks.")
+        # Overlap checks with same-profile same-date entries
+        qs = TimesheetEntry.objects.filter(profile=self.profile, date=self.date).exclude(pk=self.pk).order_by('start_time')
+        for e in qs:
+            # if new entry overlaps an existing one -> error
+            if not (self.end_time <= e.start_time or self.start_time >= e.end_time):
+                raise ValidationError("Time entry overlaps another entry for the same day. Please fix the times.")
+
+    def save(self, *args, **kwargs):
+        # set day field
+        if not self.day:
+            self.day = self.date.strftime("%A")
+        # compute duration
+        if self.start_time and self.end_time:
+            self.duration_seconds = int((self.end_time - self.start_time).total_seconds())
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{getattr(self.profile, 'emp_id', self.profile.id)} {self.date} {self.task}"
+=======
     
+>>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96

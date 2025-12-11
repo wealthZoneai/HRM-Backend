@@ -16,6 +16,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Use sqlite3 for dev
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
@@ -30,7 +31,14 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DATABASES = {
     'default': {
+<<<<<<< HEAD
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+  }
+}  
+=======
          'ENGINE': 'django.db.backends.sqlite3',
          'NAME': BASE_DIR / 'db.sqlite3',
      }
  }
+>>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96

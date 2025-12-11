@@ -611,3 +611,171 @@ class PolicySerializer(serializers.ModelSerializer):
     class Meta:
         model = Policy
         fields = '__all__'
+
+
+
+
+
+
+# emp/serializers.py
+from rest_framework import serializers
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
+
+# IMPORTANT:
+# If Attendance model lives in a different app, change the import below:
+# from attendance.models import Attendance
+from .models import TimesheetEntry, TimesheetDay, Attendance  # adjust if Attendance is elsewhere
+
+
+# -------------------------
+# Per-entry serializer
+# -------------------------
+class TimesheetEntrySerializer(serializers.ModelSerializer):
+    duration_hours = serializers.SerializerMethodField()
+    # duration_seconds will be returned as HH:MM:SS string
+    duration_seconds = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimesheetEntry
+        fields = [
+            "id", "date", "day",
+            "task", "description",
+            "start_time", "end_time",
+            "duration_seconds",
+            "duration_hours",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["duration_seconds", "duration_hours", "created_at", "updated_at"]
+
+    def _get_total_seconds_safe(self, obj):
+        """Return int seconds even if DB contains string or None."""
+        try:
+            return int(obj.duration_seconds) if obj.duration_seconds is not None else 0
+        except (TypeError, ValueError):
+            return 0
+
+    def get_duration_hours(self, obj):
+        total = self._get_total_seconds_safe(obj)
+        return round(total / 3600.0, 2)
+
+    def get_duration_seconds(self, obj):
+        total = self._get_total_seconds_safe(obj)
+        hours = total // 3600
+        minutes = (total % 3600) // 60
+        seconds = total % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+# -------------------------
+# TimesheetDay serializer
+# -------------------------
+class TimesheetDaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TimesheetDay
+        fields = ("date", "clock_in", "clock_out", "created_at", "updated_at")
+        read_only_fields = ("created_at", "updated_at")
+
+
+# -------------------------
+# Input item for batch update
+# -------------------------
+class TimesheetEntryItemSerializer(serializers.Serializer):
+    start_time = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+    task = serializers.CharField()
+    description = serializers.CharField(required=False, allow_blank=True)
+
+
+# -------------------------
+# Daily update serializer
+# -------------------------
+class DailyTimesheetUpdateSerializer(serializers.Serializer):
+    """
+    Payload:
+      {
+        "entries": [
+          {"start_time": "...", "end_time": "...", "task": "...", "description": "..."},
+          ...
+        ]
+      }
+
+    Business rules enforced:
+      - entries list required and not empty
+      - entries must be for today's date
+      - each entry end_time > start_time
+      - max 6 hours per entry
+      - entries cannot overlap
+      - employee must have Attendance.clock_in for today
+      - if Attendance.clock_out exists: every entry.end_time <= attendance.clock_out
+      - otherwise entries.end_time <= now (no future)
+      - entry.start_time >= attendance.clock_in
+    """
+    entries = TimesheetEntryItemSerializer(many=True)
+
+    def validate(self, data):
+        entries = data.get("entries", [])
+        if not entries:
+            raise ValidationError("Entries list cannot be empty.")
+
+        # today's date according to timezone
+        today = timezone.localdate()
+
+        # request & user context (serializer called with context={"request": request})
+        request = self.context.get("request")
+        if not request or not getattr(request, "user", None) or not request.user.is_authenticated:
+            raise ValidationError("Request and authenticated user must be provided in serializer context.")
+
+        user = request.user
+
+        # get today's attendance for the user
+        attendance = Attendance.objects.filter(user=user, date=today).first()
+        if not attendance or not attendance.clock_in:
+            raise ValidationError("You must clock in (attendance) before updating today's timesheet.")
+
+        login_dt = attendance.clock_in
+        now = timezone.now()
+
+        # if attendance.clock_out exists, that becomes the cutoff; otherwise cutoff is now
+        cutoff_dt = attendance.clock_out or now
+
+        # validate each entry and collect intervals
+        intervals = []
+        for idx, it in enumerate(entries, start=1):
+            s = it["start_time"]
+            e = it["end_time"]
+
+            # must be same day (today)
+            if s.date() != today or e.date() != today:
+                raise ValidationError({"entries": f"Entry #{idx} must be for today's date only."})
+
+            # end must be after start
+            if e <= s:
+                raise ValidationError({"entries": f"Entry #{idx} end_time must be after start_time."})
+
+            # max single-entry duration (6 hours)
+            if (e - s).total_seconds() > 6 * 3600:
+                raise ValidationError({"entries": f"Entry #{idx} cannot exceed 6 hours."})
+
+            # cannot start before attendance clock_in
+            if s < login_dt:
+                raise ValidationError({"entries": f"Entry #{idx} starts before your attendance clock-in ({login_dt})."})
+
+            # cannot end after cutoff (attendance.clock_out if set; otherwise now)
+            if e > cutoff_dt:
+                if attendance.clock_out:
+                    # allow updating after clock_out but entries must not exceed clock_out
+                    raise ValidationError({"entries": f"Entry #{idx} ends after attendance clock-out ({attendance.clock_out})."})
+                else:
+                    raise ValidationError({"entries": f"Entry #{idx} end_time cannot be in the future."})
+
+            intervals.append((s, e))
+
+        # check for overlapping intervals within submitted entries
+        intervals_sorted = sorted(intervals, key=lambda x: x[0])
+        for i in range(1, len(intervals_sorted)):
+            if intervals_sorted[i][0] < intervals_sorted[i-1][1]:
+                raise ValidationError("Submitted time entries cannot overlap each other.")
+
+        return data
+
