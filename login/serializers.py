@@ -52,8 +52,6 @@ class ForgotPasswordSerializer(serializers.Serializer):
         PasswordResetOTP.objects.create(user=user, otp=otp)
         send_otp_email(email, otp)
 
-        # Return an object that contains at least the serializer fields (here: email).
-        # The view expects serializer.data to be usable, so include 'email' in returned dict.
         return {"email": email}
 
 
@@ -87,7 +85,8 @@ class VerifyOTPSerializer(serializers.Serializer):
         email = validated_data["email"]
         otp = validated_data["otp"]
 
-        otp_obj = PasswordResetOTP.objects.filter(user__email=email).latest('id')
+        otp_obj = PasswordResetOTP.objects.filter(
+            user__email=email).latest('id')
 
         if otp_obj.otp != otp:
             raise serializers.ValidationError({"otp": "Invalid OTP"})
@@ -97,7 +96,6 @@ class VerifyOTPSerializer(serializers.Serializer):
             "email": email,
             "otp": otp
         }
-
 
 
 class ResetPasswordSerializer(serializers.Serializer):

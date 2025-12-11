@@ -17,13 +17,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='TLAnnouncement',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=200)),
                 ('description', models.TextField()),
                 ('date', models.DateField()),
                 ('time', models.TimeField()),
                 ('priority', models.CharField(max_length=10)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tl_created_announcements', to=settings.AUTH_USER_MODEL)),
+                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,
+                 related_name='tl_created_announcements', to=settings.AUTH_USER_MODEL)),
             ],
         ),
     ]

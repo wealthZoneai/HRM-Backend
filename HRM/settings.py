@@ -64,7 +64,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
 
-    # throttling
+
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -74,7 +74,7 @@ REST_FRAMEWORK = {
         "user": "200/day",
     },
 
-    # schema
+
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
@@ -158,22 +158,20 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-# Enable WhiteNoise only if the package is installed. This prevents import errors
-# on developer machines where whitenoise may not be available.
+
 try:
     import importlib
     importlib.import_module('whitenoise')
 
-    # Insert middleware after SecurityMiddleware if not already present
     wn_mw = 'whitenoise.middleware.WhiteNoiseMiddleware'
     if wn_mw not in MIDDLEWARE:
-        # place after SecurityMiddleware (index 2)
+
         insert_index = 2 if len(MIDDLEWARE) >= 2 else len(MIDDLEWARE)
         MIDDLEWARE.insert(insert_index, wn_mw)
 
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 except Exception:
-    # whitenoise not installed — continue without it (development fallback)
+
     STATICFILES_STORAGE = None
 
 MEDIA_URL = "/media/"
@@ -185,7 +183,7 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG
 APPEND_SLASH = False
 
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # dev mode
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 DEFAULT_FROM_EMAIL = 'noreply@wealthzonegroupai.com'
 

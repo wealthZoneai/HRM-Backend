@@ -14,18 +14,21 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='TimesheetEntry',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('date', models.DateField()),
                 ('day', models.CharField(blank=True, max_length=20)),
                 ('task', models.CharField(max_length=250)),
                 ('description', models.TextField(blank=True, null=True)),
                 ('start_time', models.DateTimeField()),
                 ('end_time', models.DateTimeField()),
-                ('duration_seconds', models.PositiveIntegerField(blank=True, null=True)),
+                ('duration_seconds', models.PositiveIntegerField(
+                    blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('manual', models.BooleanField(default=True)),
-                ('profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='timesheet_entries', to='emp.employeeprofile')),
+                ('profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,
+                 related_name='timesheet_entries', to='emp.employeeprofile')),
             ],
             options={
                 'ordering': ['-date', '-start_time'],

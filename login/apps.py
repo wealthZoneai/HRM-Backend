@@ -7,4 +7,4 @@ class LoginConfig(AppConfig):
     name = 'login'
 
     def ready(self):
-        pass   # No signals here
+        pass

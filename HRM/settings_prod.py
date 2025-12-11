@@ -8,7 +8,6 @@ from .settings import *
 from django.core.management.utils import get_random_secret_key
 import dj_database_url
 
-# SECRET_KEY
 
 env_secret = os.environ.get("SECRET_KEY")
 if env_secret:
@@ -19,12 +18,9 @@ else:
     except NameError:
         SECRET_KEY = get_random_secret_key()
 
-# DEBUG
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-
-# ALLOWED_HOSTS
 
 allowed = os.environ.get("ALLOWED_HOSTS", "")
 if allowed:
@@ -42,7 +38,6 @@ DATABASES = {
     )
 }
 
-# CORS
 
 CORS_ALLOW_ALL_ORIGINS = False
 cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
@@ -53,7 +48,6 @@ if cors_origins:
 else:
     CORS_ALLOWED_ORIGINS = []
 
-# CSRF TRUSTED ORIGINS
 
 csrf_trusted = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
 if csrf_trusted:
@@ -63,7 +57,6 @@ if csrf_trusted:
 else:
     CSRF_TRUSTED_ORIGINS = []
 
-# SECURITY HEADERS
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -75,7 +68,6 @@ SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "False") == "True"
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-# LOGGING
 
 LOGGING = {
     "version": 1,

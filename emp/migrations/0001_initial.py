@@ -15,12 +15,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Attendance',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('date', models.DateField()),
                 ('clock_in', models.DateTimeField()),
                 ('clock_out', models.DateTimeField(blank=True, null=True)),
-                ('duration_time', models.CharField(blank=True, max_length=20, null=True)),
-                ('status', models.CharField(choices=[('working', 'Working'), ('present', 'Present'), ('halfday', 'Half Day'), ('absent', 'Absent')], default='working', max_length=20)),
+                ('duration_time', models.CharField(
+                    blank=True, max_length=20, null=True)),
+                ('status', models.CharField(choices=[('working', 'Working'), ('present', 'Present'), (
+                    'halfday', 'Half Day'), ('absent', 'Absent')], default='working', max_length=20)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],
@@ -31,10 +34,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='CalendarEvent',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=250)),
                 ('description', models.TextField(blank=True, null=True)),
-                ('event_type', models.CharField(choices=[('meeting', 'Meeting'), ('announcement', 'Announcement'), ('holiday', 'Holiday')], default='announcement', max_length=50)),
+                ('event_type', models.CharField(choices=[('meeting', 'Meeting'), (
+                    'announcement', 'Announcement'), ('holiday', 'Holiday')], default='announcement', max_length=50)),
                 ('date', models.DateField()),
                 ('start_time', models.TimeField(blank=True, null=True)),
                 ('end_time', models.TimeField(blank=True, null=True)),
@@ -49,38 +54,59 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='EmployeeProfile',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('emp_id', models.CharField(max_length=20, unique=True)),
                 ('work_email', models.EmailField(max_length=254, unique=True)),
                 ('username', models.CharField(blank=True, max_length=150, null=True)),
                 ('first_name', models.CharField(max_length=80)),
                 ('last_name', models.CharField(max_length=80)),
-                ('middle_name', models.CharField(blank=True, max_length=80, null=True)),
-                ('personal_email', models.EmailField(blank=True, max_length=254, null=True)),
-                ('phone_number', models.CharField(blank=True, max_length=20, null=True)),
-                ('alternate_number', models.CharField(blank=True, max_length=20, null=True)),
+                ('middle_name', models.CharField(
+                    blank=True, max_length=80, null=True)),
+                ('personal_email', models.EmailField(
+                    blank=True, max_length=254, null=True)),
+                ('phone_number', models.CharField(
+                    blank=True, max_length=20, null=True)),
+                ('alternate_number', models.CharField(
+                    blank=True, max_length=20, null=True)),
                 ('dob', models.DateField(blank=True, null=True)),
-                ('blood_group', models.CharField(blank=True, max_length=5, null=True)),
+                ('blood_group', models.CharField(
+                    blank=True, max_length=5, null=True)),
                 ('gender', models.CharField(blank=True, max_length=20, null=True)),
-                ('marital_status', models.CharField(blank=True, max_length=20, null=True)),
-                ('profile_photo', models.ImageField(blank=True, null=True, upload_to='profile_photos/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
-                ('aadhaar_number', models.CharField(blank=True, max_length=20, null=True)),
-                ('aadhaar_image', models.ImageField(blank=True, null=True, upload_to='ids/aadhaar/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('marital_status', models.CharField(
+                    blank=True, max_length=20, null=True)),
+                ('profile_photo', models.ImageField(blank=True, null=True, upload_to='profile_photos/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('aadhaar_number', models.CharField(
+                    blank=True, max_length=20, null=True)),
+                ('aadhaar_image', models.ImageField(blank=True, null=True, upload_to='ids/aadhaar/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
                 ('pan', models.CharField(blank=True, max_length=20, null=True)),
-                ('pan_image', models.ImageField(blank=True, null=True, upload_to='ids/pan/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
-                ('passport_number', models.CharField(blank=True, max_length=20, null=True)),
-                ('passport_image', models.ImageField(blank=True, null=True, upload_to='ids/passport/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
-                ('id_card_number', models.CharField(blank=True, max_length=50, null=True)),
-                ('id_card_image', models.ImageField(blank=True, null=True, upload_to='ids/idcard/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
-                ('job_title', models.CharField(blank=True, max_length=150, null=True)),
-                ('department', models.CharField(blank=True, choices=[('Python', 'Python'), ('Testing', 'Testing'), ('Java', 'Java'), ('UI/UX', 'UI/UX'), ('React', 'React'), ('Cyber Security', 'Cyber Security'), ('Digital Marketing', 'Digital Marketing'), ('HR', 'HR'), ('BDM', 'BDM'), ('Networking', 'Networking'), ('Cloud', 'Cloud (AWS/DevOps)')], max_length=100, null=True)),
-                ('employment_type', models.CharField(blank=True, max_length=50, null=True)),
+                ('pan_image', models.ImageField(blank=True, null=True, upload_to='ids/pan/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('passport_number', models.CharField(
+                    blank=True, max_length=20, null=True)),
+                ('passport_image', models.ImageField(blank=True, null=True, upload_to='ids/passport/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('id_card_number', models.CharField(
+                    blank=True, max_length=50, null=True)),
+                ('id_card_image', models.ImageField(blank=True, null=True, upload_to='ids/idcard/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('job_title', models.CharField(
+                    blank=True, max_length=150, null=True)),
+                ('department', models.CharField(blank=True, choices=[('Python', 'Python'), ('Testing', 'Testing'), ('Java', 'Java'), ('UI/UX', 'UI/UX'), ('React', 'React'), ('Cyber Security', 'Cyber Security'), (
+                    'Digital Marketing', 'Digital Marketing'), ('HR', 'HR'), ('BDM', 'BDM'), ('Networking', 'Networking'), ('Cloud', 'Cloud (AWS/DevOps)')], max_length=100, null=True)),
+                ('employment_type', models.CharField(
+                    blank=True, max_length=50, null=True)),
                 ('start_date', models.DateField(blank=True, null=True)),
                 ('location', models.CharField(blank=True, max_length=150, null=True)),
                 ('job_description', models.TextField(blank=True, null=True)),
-                ('id_image', models.ImageField(blank=True, null=True, upload_to='employee/id_cards/', validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
-                ('bank_name', models.CharField(blank=True, max_length=150, null=True)),
-                ('account_number', models.CharField(blank=True, max_length=64, null=True)),
+                ('id_image', models.ImageField(blank=True, null=True, upload_to='employee/id_cards/',
+                 validators=[emp.validators.validate_file_size, emp.validators.validate_image_extension])),
+                ('bank_name', models.CharField(
+                    blank=True, max_length=150, null=True)),
+                ('account_number', models.CharField(
+                    blank=True, max_length=64, null=True)),
                 ('ifsc_code', models.CharField(blank=True, max_length=20, null=True)),
                 ('branch', models.CharField(blank=True, max_length=150, null=True)),
                 ('role', models.CharField(default='employee', max_length=30)),
@@ -95,7 +121,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='EmployeeSalary',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('effective_from', models.DateField()),
                 ('is_active', models.BooleanField(default=True)),
             ],
@@ -103,22 +130,27 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='LeaveBalance',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('total_allocated', models.DecimalField(decimal_places=2, default=0.0, max_digits=6)),
-                ('used', models.DecimalField(decimal_places=2, default=0.0, max_digits=6)),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
+                ('total_allocated', models.DecimalField(
+                    decimal_places=2, default=0.0, max_digits=6)),
+                ('used', models.DecimalField(
+                    decimal_places=2, default=0.0, max_digits=6)),
             ],
         ),
         migrations.CreateModel(
             name='LeaveRequest',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('leave_type', models.CharField(max_length=120)),
                 ('start_date', models.DateField()),
                 ('end_date', models.DateField()),
                 ('days', models.DecimalField(decimal_places=2, max_digits=5)),
                 ('reason', models.TextField(blank=True, null=True)),
                 ('applied_at', models.DateTimeField(auto_now_add=True)),
-                ('status', models.CharField(choices=[('applied', 'Applied'), ('tl_approved', 'TL Approved'), ('tl_rejected', 'TL Rejected'), ('hr_approved', 'HR Approved'), ('hr_rejected', 'HR Rejected'), ('pending_hr', 'Pending HR'), ('cancelled', 'Cancelled'), ('completed', 'Completed')], default='applied', max_length=30)),
+                ('status', models.CharField(choices=[('applied', 'Applied'), ('tl_approved', 'TL Approved'), ('tl_rejected', 'TL Rejected'), ('hr_approved', 'HR Approved'), (
+                    'hr_rejected', 'HR Rejected'), ('pending_hr', 'Pending HR'), ('cancelled', 'Cancelled'), ('completed', 'Completed')], default='applied', max_length=30)),
                 ('tl_remarks', models.TextField(blank=True, null=True)),
                 ('hr_remarks', models.TextField(blank=True, null=True)),
                 ('last_action_at', models.DateTimeField(blank=True, null=True)),
@@ -130,7 +162,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='LeaveType',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=120)),
                 ('code', models.CharField(blank=True, max_length=50, null=True)),
                 ('description', models.TextField(blank=True, null=True)),
@@ -139,10 +172,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Notification',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=250)),
                 ('body', models.TextField()),
-                ('notif_type', models.CharField(choices=[('announcement', 'Announcement'), ('meeting', 'Meeting'), ('birthday', 'Birthday'), ('anniversary', 'Anniversary'), ('leave', 'Leave'), ('payroll', 'Payroll')], default='announcement', max_length=50)),
+                ('notif_type', models.CharField(choices=[('announcement', 'Announcement'), ('meeting', 'Meeting'), ('birthday', 'Birthday'), (
+                    'anniversary', 'Anniversary'), ('leave', 'Leave'), ('payroll', 'Payroll')], default='announcement', max_length=50)),
                 ('is_read', models.BooleanField(default=False)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('extra', models.JSONField(blank=True, null=True)),
@@ -154,15 +189,20 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Payslip',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('year', models.PositiveIntegerField()),
                 ('month', models.PositiveIntegerField()),
                 ('working_days', models.IntegerField(default=0)),
                 ('days_present', models.IntegerField(default=0)),
-                ('gross_amount', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('overtime_amount', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
-                ('deductions', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
-                ('net_amount', models.DecimalField(decimal_places=2, max_digits=12)),
+                ('gross_amount', models.DecimalField(
+                    decimal_places=2, max_digits=12)),
+                ('overtime_amount', models.DecimalField(
+                    decimal_places=2, default=0, max_digits=12)),
+                ('deductions', models.DecimalField(
+                    decimal_places=2, default=0, max_digits=12)),
+                ('net_amount', models.DecimalField(
+                    decimal_places=2, max_digits=12)),
                 ('details', models.JSONField(blank=True, null=True)),
                 ('generated_at', models.DateTimeField(auto_now_add=True)),
                 ('finalized', models.BooleanField(default=False)),
@@ -174,9 +214,11 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Policy',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=250)),
-                ('policy_type', models.CharField(choices=[('policy', 'Policy'), ('terms', 'Terms'), ('resignation', 'Resignation'), ('termination', 'Termination')], default='policy', max_length=50)),
+                ('policy_type', models.CharField(choices=[('policy', 'Policy'), ('terms', 'Terms'), (
+                    'resignation', 'Resignation'), ('termination', 'Termination')], default='policy', max_length=50)),
                 ('description', models.TextField()),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
@@ -187,23 +229,31 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='SalaryStructure',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=150)),
-                ('monthly_ctc', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('basic_percent', models.DecimalField(decimal_places=2, default=50.0, max_digits=5)),
-                ('hra_percent', models.DecimalField(decimal_places=2, default=20.0, max_digits=5)),
-                ('other_allowances', models.DecimalField(decimal_places=2, default=0.0, max_digits=12)),
-                ('overtime_multiplier', models.DecimalField(decimal_places=2, default=1.25, max_digits=4)),
+                ('monthly_ctc', models.DecimalField(
+                    decimal_places=2, max_digits=12)),
+                ('basic_percent', models.DecimalField(
+                    decimal_places=2, default=50.0, max_digits=5)),
+                ('hra_percent', models.DecimalField(
+                    decimal_places=2, default=20.0, max_digits=5)),
+                ('other_allowances', models.DecimalField(
+                    decimal_places=2, default=0.0, max_digits=12)),
+                ('overtime_multiplier', models.DecimalField(
+                    decimal_places=2, default=1.25, max_digits=4)),
             ],
         ),
         migrations.CreateModel(
             name='Shift',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=120)),
                 ('start_time', models.TimeField()),
                 ('end_time', models.TimeField()),
-                ('total_hours', models.DecimalField(decimal_places=2, default=8.0, max_digits=4)),
+                ('total_hours', models.DecimalField(
+                    decimal_places=2, default=8.0, max_digits=4)),
                 ('grace_minutes', models.PositiveIntegerField(default=5)),
                 ('late_threshold', models.PositiveIntegerField(default=15)),
             ],

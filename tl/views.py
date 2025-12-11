@@ -1,4 +1,7 @@
 # tl/views.py
+from hr.serializers import AnnouncementSerializer as TLAnnouncementSerializer
+from .models import TLAnnouncement
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics, status
@@ -19,7 +22,6 @@ from hr.serializers import TLAnnouncementSerializer
 
 User = get_user_model()
 
-# TL: Team Members List
 
 class TLTeamMembersAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsTL]
@@ -29,8 +31,6 @@ class TLTeamMembersAPIView(generics.ListAPIView):
 
         return EmployeeProfile.objects.filter(team_lead=self.request.user)
 
-
-# TL: Pending Leave Requests
 
 class TLPendingLeaveAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsTL]
@@ -43,8 +43,6 @@ class TLPendingLeaveAPIView(generics.ListAPIView):
         ).select_related("profile", "leave_type")
 
 
-# TL: Approve/Reject Leave
-
 class TLApproveRejectLeaveAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
 
@@ -54,7 +52,7 @@ class TLApproveRejectLeaveAPIView(APIView):
         if leave.tl != request.user:
             return Response({"detail": "Not your team member"}, status=403)
 
-        action = request.data.get("action")  # approve / reject
+        action = request.data.get("action")
         remarks = request.data.get("remarks", "")
 
         if action == "approve":
@@ -65,8 +63,6 @@ class TLApproveRejectLeaveAPIView(APIView):
         leave.apply_tl_approval(request.user, approve=False, remarks=remarks)
         return Response({"detail": "TL rejected leave."})
 
-
-# TL: Team Attendance List
 
 class TLTeamAttendanceAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsTL]
@@ -85,8 +81,6 @@ class TLTeamAttendanceAPIView(generics.ListAPIView):
 
         return qs.order_by("-date")
 
-
-# TL: Create Calendar Event (Team Meeting)
 
 class TLCreateEventAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
@@ -112,8 +106,6 @@ class TLCreateEventAPIView(APIView):
         return Response(CalendarEventSerializer(event).data, status=201)
 
 
-# TL Dashboard Summary
-
 class TLDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
 
@@ -122,16 +114,13 @@ class TLDashboardAPIView(APIView):
 
         team_members = EmployeeProfile.objects.filter(team_lead=user)
 
-        # Team count
         team_count = team_members.count()
 
-        # Pending leaves
         pending_leaves = LeaveRequest.objects.filter(
             tl=user,
             status="applied"
         ).count()
 
-        # Attendance summary (current month)
         today = timezone.localdate()
         y, m = today.year, today.month
         attendance_qs = Attendance.objects.filter(
@@ -144,7 +133,6 @@ class TLDashboardAPIView(APIView):
         total_hours = attendance_qs.aggregate(
             total=Sum("duration_time"))["total"] or 0
 
-        # Upcoming meetings
         meetings = CalendarEvent.objects.filter(
             event_type="meeting",
             created_by=user
@@ -168,16 +156,17 @@ class TeamLeadListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Optional query param: ?department=<dept>
+
         dept = request.query_params.get('department')
-        # users with role 'tl' AND having EmployeeProfile
+
         qs = User.objects.filter(role='tl', employeeprofile__isnull=False)
         if dept:
             qs = qs.filter(employeeprofile__department__iexact=dept)
-        # prefer list of EmployeeProfile info
+
         profiles = EmployeeProfile.objects.filter(user__in=qs)
         ser = TeamMemberSerializer(profiles, many=True)
         return Response(ser.data)
+
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -197,27 +186,18 @@ def tl_create_announcement(request):
             "message": "Announcement created successfully",
             "data": serializer.data
         }, status=status.HTTP_201_CREATED)
-    
+
     return Response({
         "success": False,
         "errors": serializer.errors
     }, status=status.HTTP_400_BAD_REQUEST)
 
 
-# tl/views.py
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import TLAnnouncement
-from hr.serializers import AnnouncementSerializer as TLAnnouncementSerializer
-
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def tl_create_announcement(request):
     data = request.data.copy()
-    data['created_by'] = request.user.id  # auto assign TL
+    data['created_by'] = request.user.id
 
     serializer = TLAnnouncementSerializer(data=data)
     if serializer.is_valid():

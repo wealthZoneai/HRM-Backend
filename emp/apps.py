@@ -7,4 +7,4 @@ class EmpConfig(AppConfig):
     name = 'emp'
 
     def ready(self):
-        import emp.signals  # registers signals
+        import emp.signals

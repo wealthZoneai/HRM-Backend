@@ -15,24 +15,29 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Announcement',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=200)),
                 ('description', models.TextField()),
                 ('date', models.DateField(auto_now_add=True)),
                 ('time', models.TimeField()),
-                ('department', models.CharField(choices=[('HR', 'Human Resources'), ('EMP', 'Employee'), ('TL', 'Team Lead'), ('FIN', 'Finance'), ('MKT', 'Marketing'), ('IT', 'IT Department')], max_length=50)),
-                ('priority', models.CharField(choices=[('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High')], max_length=10)),
+                ('department', models.CharField(choices=[('HR', 'Human Resources'), ('EMP', 'Employee'), (
+                    'TL', 'Team Lead'), ('FIN', 'Finance'), ('MKT', 'Marketing'), ('IT', 'IT Department')], max_length=50)),
+                ('priority', models.CharField(choices=[
+                 ('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High')], max_length=10)),
             ],
         ),
         migrations.CreateModel(
             name='TLAnnouncement',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True,
+                 primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=200)),
                 ('description', models.TextField()),
                 ('date', models.DateField(default=django.utils.timezone.now)),
                 ('time', models.TimeField()),
-                ('priority', models.CharField(choices=[('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High')], max_length=10)),
+                ('priority', models.CharField(choices=[
+                 ('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High')], max_length=10)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
         ),

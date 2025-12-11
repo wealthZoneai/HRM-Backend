@@ -1,8 +1,7 @@
 # tl/models.py
-# TL app depends on emp.models, no models required.
-# tl/models.py
 from django.db import models
 from django.conf import settings
+
 
 class TLAnnouncement(models.Model):
     title = models.CharField(max_length=200)

@@ -1,4 +1,5 @@
 # emp/models.py
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -11,13 +12,10 @@ User = settings.AUTH_USER_MODEL
 class EmployeeProfile(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='employeeprofile')
-   
-    # System fields
+
     emp_id = models.CharField(max_length=20, unique=True)
     work_email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, null=True, blank=True)
-
-    # Contact Information (Employee Editable)
 
     first_name = models.CharField(max_length=80)
     last_name = models.CharField(max_length=80)
@@ -40,7 +38,6 @@ class EmployeeProfile(models.Model):
         validators=[validate_file_size, validate_image_extension]
     )
 
-    # Identity Information
     aadhaar_number = models.CharField(max_length=20, null=True, blank=True)
     aadhaar_image = models.ImageField(
         upload_to='ids/aadhaar/',
@@ -65,7 +62,6 @@ class EmployeeProfile(models.Model):
         validators=[validate_file_size, validate_image_extension]
     )
 
-    # Existing Id Card Fields (keep as is)
     id_card_number = models.CharField(max_length=50, null=True, blank=True)
     id_card_image = models.ImageField(
         upload_to='ids/idcard/',
@@ -74,7 +70,6 @@ class EmployeeProfile(models.Model):
         validators=[validate_file_size, validate_image_extension]
     )
 
-    # Job Information (HR Editable)
     job_title = models.CharField(max_length=150, null=True, blank=True)
 
     DEPARTMENT_CHOICES = [
@@ -153,8 +148,6 @@ class EmployeeProfile(models.Model):
         ordering = ['-created_at']
 
 
-# Notifications
-
 class Notification(models.Model):
     NOTIF_TYPES = [
         ('announcement', 'Announcement'),
@@ -177,13 +170,10 @@ class Notification(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-        
     def __str__(self):
         return f"{self.title} → {self.to_user}"
- 
-# -----------------------
-# Shift & Attendance
-# -----------------------
+
+
 class Shift(models.Model):
     name = models.CharField(max_length=120)
     start_time = models.TimeField()
@@ -191,7 +181,7 @@ class Shift(models.Model):
     total_hours = models.DecimalField(
         max_digits=4, decimal_places=2, default=8.00)
     grace_minutes = models.PositiveIntegerField(default=5)
-    late_threshold = models.PositiveIntegerField(default=15)  # minutes
+    late_threshold = models.PositiveIntegerField(default=15)
 
     def __str__(self):
         return f"{self.name} ({self.start_time}-{self.end_time})"
@@ -207,17 +197,17 @@ class Attendance(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='attendances')
     date = models.DateField()
-    # shift = models.ForeignKey(Shift, null=True, blank=True, on_delete=models.SET_NULL)
+
     clock_in = models.DateTimeField()
     clock_out = models.DateTimeField(null=True, blank=True)
-    duration_time = models.CharField(max_length=20, null=True, blank=True)
+
+    duration_time = models.CharField(
+        max_length=20, null=True, blank=True)
+    duration_seconds = models.IntegerField(
+        null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='working')
-    # is_remote = models.BooleanField(default=False)
-    # late_by_seconds = models.PositiveIntegerField(null=True, blank=True)
-    # overtime_seconds = models.PositiveIntegerField(null=True, blank=True)
-    # note = models.TextField(null=True, blank=True)
-    # manual_entry = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -227,8 +217,8 @@ class Attendance(models.Model):
 
     def compute_duration_and_overtime(self, standard_seconds=9*3600):
         """
-        Calculate duration_time and overtime_seconds automatically.
-        Default standard_time = 9 hours.
+        Calculate duration_time (HH:MM:SS) and duration_seconds.
+        Default standard_seconds = 9 hours.
         """
         if not self.clock_in or not self.clock_out:
             return
@@ -238,7 +228,10 @@ class Attendance(models.Model):
         mins = (total_seconds % 3600) // 60
         secs = total_seconds % 60
         self.duration_time = f"{hrs:02}:{mins:02}:{secs:02}"
-        hours = total_seconds / 3600
+        self.duration_seconds = total_seconds
+
+        hours = total_seconds / 3600.0
+
         if hours >= 9:
             self.status = 'present'
         elif 2 <= hours < 9:
@@ -249,9 +242,6 @@ class Attendance(models.Model):
             self.status = 'working'
 
 
-# -----------------------
-# Calendar Events
-# -----------------------
 class CalendarEvent(models.Model):
     EVENT_TYPES = [
         ('meeting', 'Meeting'),
@@ -275,9 +265,6 @@ class CalendarEvent(models.Model):
         ordering = ['-date']
 
 
-# -----------------------
-# Payroll (Option B - Advanced Payslip)
-# -----------------------
 class SalaryStructure(models.Model):
     name = models.CharField(max_length=150)
     monthly_ctc = models.DecimalField(max_digits=12, decimal_places=2)
@@ -337,11 +324,8 @@ class Payslip(models.Model):
         ordering = ['-year', '-month']
 
 
-# -----------------------
-# Leave (employee essentials)
-# -----------------------
 class LeaveType(models.Model):
-    name = models.CharField(max_length=120)  # Casual, Sick, Paid, Unpaid, etc.
+    name = models.CharField(max_length=120)
     code = models.CharField(max_length=50, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
 
@@ -421,9 +405,6 @@ class LeaveRequest(models.Model):
         self.save()
 
 
-# -----------------------
-# Policies (static documents)
-# -----------------------
 class Policy(models.Model):
     POLICY_TYPES = [
         ('policy', 'Policy'),
@@ -435,26 +416,16 @@ class Policy(models.Model):
     policy_type = models.CharField(
         max_length=50, choices=POLICY_TYPES, default='policy')
     description = models.TextField()
-    # file = models.FileField(upload_to='policies/', null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
 
 
-<<<<<<< HEAD
-# emp/models.py (append)
-
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-
-# note: EmployeeProfile is expected to exist in your project:
-# either in this app or accessible as settings.AUTH_USER_MODEL related object.
-# TimesheetDay stores per-day metadata (clock_in/clock_out).
 class TimesheetDay(models.Model):
-    profile = models.ForeignKey('EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_days')
+    profile = models.ForeignKey(
+        'EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_days')
     date = models.DateField()
     clock_in = models.DateTimeField(null=True, blank=True)
     clock_out = models.DateTimeField(null=True, blank=True)
@@ -474,14 +445,15 @@ class TimesheetEntry(models.Model):
     Task-level timesheet entry for a specific employee and date.
     This implementation is self-contained and uses TimesheetDay for clock-in/out metadata.
     """
-    profile = models.ForeignKey('EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_entries')
-    date = models.DateField()               # calendar date for the entry
+    profile = models.ForeignKey(
+        'EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_entries')
+    date = models.DateField()
     day = models.CharField(max_length=20, blank=True)
     task = models.CharField(max_length=250)
     description = models.TextField(blank=True, null=True)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    duration_seconds = models.CharField(max_length=20,null=True, blank=True)
+    duration_seconds = models.IntegerField(null=True, blank=True)
     manual = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -491,32 +463,35 @@ class TimesheetEntry(models.Model):
         unique_together = ('profile', 'date', 'start_time', 'end_time')
 
     def clean(self):
-        # Basic sanity checks
+
         if self.end_time <= self.start_time:
             raise ValidationError("End time must be after start time.")
         if self.start_time.date() != self.date or self.end_time.date() != self.date:
-            raise ValidationError("Start and end must be on the same date as the 'date' field.")
-        # Max duration guard
+            raise ValidationError(
+                "Start and end must be on the same date as the 'date' field.")
+
         if (self.end_time - self.start_time).total_seconds() > 6 * 3600:
-            raise ValidationError("Single task duration should not exceed 6 hours. Split into smaller tasks.")
-        # Overlap checks with same-profile same-date entries
-        qs = TimesheetEntry.objects.filter(profile=self.profile, date=self.date).exclude(pk=self.pk).order_by('start_time')
+            raise ValidationError(
+                "Single task duration should not exceed 6 hours. Split into smaller tasks.")
+
+        qs = TimesheetEntry.objects.filter(profile=self.profile, date=self.date).exclude(
+            pk=self.pk).order_by('start_time')
         for e in qs:
-            # if new entry overlaps an existing one -> error
+
             if not (self.end_time <= e.start_time or self.start_time >= e.end_time):
-                raise ValidationError("Time entry overlaps another entry for the same day. Please fix the times.")
+                raise ValidationError(
+                    "Time entry overlaps another entry for the same day. Please fix the times.")
 
     def save(self, *args, **kwargs):
-        # set day field
+
         if not self.day:
             self.day = self.date.strftime("%A")
-        # compute duration
+
         if self.start_time and self.end_time:
-            self.duration_seconds = int((self.end_time - self.start_time).total_seconds())
+            self.duration_seconds = int(
+                (self.end_time - self.start_time).total_seconds())
+
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{getattr(self.profile, 'emp_id', self.profile.id)} {self.date} {self.task}"
-=======
-    
->>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96

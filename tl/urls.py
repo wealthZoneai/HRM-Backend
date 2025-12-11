@@ -8,12 +8,13 @@ urlpatterns = [
     path("team/dashboard/", views.TLDashboardAPIView.as_view()),
     path("tl/list/", views.TeamLeadListAPIView.as_view()),
 
-    # Leave management
+
     path("leave/pending/", views.TLPendingLeaveAPIView.as_view()),
     path("leave/<int:leave_id>/action/",
          views.TLApproveRejectLeaveAPIView.as_view()),
 
-    # Calendar
+
     path("calendar/create/", views.TLCreateEventAPIView.as_view()),
- path("announcement/create/", views.tl_create_announcement, name="tl-create-announcement"),
+    path("announcement/create/", views.tl_create_announcement,
+         name="tl-create-announcement"),
 ]

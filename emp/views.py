@@ -1,22 +1,28 @@
 # emp/views.py
+from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner
+from .serializers import TimesheetEntrySerializer, TimesheetDaySerializer
+from django.utils.dateparse import parse_date, parse_datetime
+from urllib.parse import unquote
+from .serializers import (
+    TimesheetEntrySerializer,
+    TimesheetDaySerializer,
+    DailyTimesheetUpdateSerializer,
+)
+from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
+from django.db import transaction
 import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.db.models import Sum, Count
 import calendar
 from .serializers import EmployeeCreateSerializer, EmployeeProfileReadSerializer
 from . import models, serializers
-from .permissions import IsHROrManagement, IsTLorHRorOwner
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-<<<<<<< HEAD
-from .models import Attendance
-
-=======
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from hr.models import Announcement
@@ -24,23 +30,8 @@ from hr.serializers import AnnouncementSerializer
 from .models import Notification
 from .serializers import NotificationSerializer
 from tl.models import TLAnnouncement
-from .models import EmployeeProfile
-from tl.serializers import TLAnnouncementSerializer
->>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96
-User = get_user_model()
-from tl.serializers import TLAnnouncementSerializer
 
-# If you have a TL-specific announcement serializer, import it; otherwise fallback to AnnouncementSerializer
-try:
-    from hr.serializers import TLAnnouncementSerializer
-    TL_ANNOUNCEMENT_SERIALIZER = TLAnnouncementSerializer
-except Exception:
-    TL_ANNOUNCEMENT_SERIALIZER = AnnouncementSerializer
-
-# from hr.models import Announcement
 User = get_user_model()
-from django.shortcuts import render
-# --- Profile ---
 
 
 class MyProfileView(APIView):
@@ -74,8 +65,6 @@ class UpdateIdentificationView(APIView):
         serializer.save()
         return Response(serializer.data)
 
-# --- Notifications ---
-
 
 class MyNotificationsList(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -96,8 +85,6 @@ class MarkNotificationsRead(APIView):
         models.Notification.objects.filter(
             id__in=ids, to_user=request.user).update(is_read=True)
         return Response({"marked": len(ids)})
-
-# --- Dashboard ---
 
 
 class DashboardSummaryAPIView(APIView):
@@ -120,12 +107,12 @@ class DashboardSummaryAPIView(APIView):
         qs = models.Attendance.objects.filter(
             user=user, date__year=y, date__month=m, status='completed')
         days_present = qs.count()
-        total_seconds = qs.aggregate(total=Sum('duration_time'))[
+        total_seconds = qs.aggregate(total=Sum('duration_seconds'))[
             'total'] or 0
         monthly_summary = {'year': y, 'month': m, 'days_present': days_present, 'hours': round(
-            total_seconds/3600, 2)}
+            total_seconds/3600.0, 2)}
 
-        project_status = []  # placeholder for React; they will fetch separate API if exists
+        project_status = []
 
         announcements = models.Notification.objects.filter(
             to_user=user).order_by('-created_at')[:5]
@@ -149,8 +136,6 @@ class DashboardSummaryAPIView(APIView):
             'upcoming_holidays': up_ser,
         })
 
-# --- Attendance ---
-
 
 class ClockInAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -161,10 +146,6 @@ class ClockInAPIView(APIView):
 
         if models.Attendance.objects.filter(user=user, date=today).exists():
             return Response({"detail": "Attendance for today already exists."}, status=400)
-        # shift_id = request.data.get('shift')
-        # shift = None
-        # if shift_id:
-        #     shift = get_object_or_404(models.Shift, id=shift_id)
         att = models.Attendance.objects.create(user=user, date=today, clock_in=timezone.now(
         ), status='working')
         return Response(serializers.AttendanceReadSerializer(att).data, status=201)
@@ -200,8 +181,6 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
         else:
             return models.Attendance.objects.filter(user=user).order_by('-date')[:30]
 
-# --- Calendar ---
-
 
 class CalendarEventsAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -215,10 +194,8 @@ class CalendarEventsAPIView(generics.ListAPIView):
         q = models.CalendarEvent.objects.filter(
             date__year=year, date__month=month)
         return q
-    
-# ----------------------------
-# EMP — VIEW ALL ANNOUNCEMENTS
-# ----------------------------
+
+
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -231,9 +208,6 @@ def emp_all_announcements(request):
     })
 
 
-# ------------------------------------------
-# EMP — VIEW ONLY THEIR NOTIFICATIONS
-# ------------------------------------------
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -249,9 +223,6 @@ def emp_notifications(request):
     })
 
 
-# ------------------------------------------
-# EMP — MARK ALL NOTIFICATIONS AS READ
-# ------------------------------------------
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -267,9 +238,6 @@ def mark_notifications_read(request):
     })
 
 
-# ------------------------------------------
-# EMP — TL ANNOUNCEMENTS (by this employee's TL)
-# ------------------------------------------
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -279,10 +247,8 @@ def emp_tl_announcements(request):
     It supports EmployeeProfile fields named either `tl` or `team_lead`.
     """
     try:
-        # Lazy import to avoid circular imports if EmployeeProfile is in another app
-        from hr.models import EmployeeProfile  # adjust path if your profile lives elsewhere
+        from hr.models import EmployeeProfile
     except Exception:
-        # If EmployeeProfile not found, return informative error
         return Response({
             "success": False,
             "message": "EmployeeProfile model not available (check import path)"
@@ -296,7 +262,6 @@ def emp_tl_announcements(request):
             "message": "Employee profile not found"
         }, status=status.HTTP_404_NOT_FOUND)
 
-    # support both possible attribute names used in different projects
     tl = getattr(profile, "team_lead", None) or getattr(profile, "tl", None)
 
     if tl is None:
@@ -306,9 +271,9 @@ def emp_tl_announcements(request):
             "message": "No Team Lead assigned"
         }, status=status.HTTP_200_OK)
 
-    # fetch announcements created by the TL user
-    announcements = Announcement.objects.filter(created_by=tl).order_by('-date')
-    serializer = TL_ANNOUNCEMENT_SERIALIZER(announcements, many=True)
+    announcements = Announcement.objects.filter(
+        created_by=tl).order_by('-date')
+    serializer = serializers.TLAnnouncementSerializer(announcements, many=True)
     return Response({
         "success": True,
         "data": serializer.data
@@ -320,15 +285,13 @@ class MyNotificationsList(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        notifications = Notification.objects.filter(to_user=request.user).order_by('-created_at')
+        notifications = Notification.objects.filter(
+            to_user=request.user).order_by('-created_at')
         serializer = NotificationSerializer(notifications, many=True)
         return Response({
             "success": True,
             "data": serializer.data
         })
-
-
-# --- Payroll ---
 
 
 class MySalaryDetailsAPIView(APIView):
@@ -360,10 +323,8 @@ class PayslipDownloadAPIView(APIView):
         prof = request.user.employeeprofile
         payslip = get_object_or_404(
             models.Payslip, profile=prof, year=year, month=month)
-        # TODO: implement PDF generation (ReportLab or WeasyPrint)
-        return Response({'download_url': f'/media/payslips/{prof.emp_id}-{year}-{month}.pdf', 'payslip': serializers.PayslipSerializer(payslip).data})
 
-# --- Leave ---
+        return Response({'download_url': f'/media/payslips/{prof.emp_id}-{year}-{month}.pdf', 'payslip': serializers.PayslipSerializer(payslip).data})
 
 
 class MyLeaveBalancesAPIView(APIView):
@@ -397,9 +358,6 @@ class LeaveApplyAPIView(APIView):
         start = ser.validated_data['start_date']
         end = ser.validated_data['end_date']
 
-        # ------------------------------------------------------------------
-        # 1. If the applicant is a TL → route to HR directly
-        # ------------------------------------------------------------------
         if request.user.role == 'tl':
             route_direct_to_hr = True
             actionable_tl = None
@@ -407,9 +365,6 @@ class LeaveApplyAPIView(APIView):
             route_direct_to_hr = False
             actionable_tl = None
 
-        # ------------------------------------------------------------------
-        # 2. Employee case → Select actionable TL (if any)
-        # ------------------------------------------------------------------
         if not route_direct_to_hr:
             primary_tl = getattr(prof, 'team_lead', None)
             if primary_tl and not getattr(primary_tl, 'is_active', True):
@@ -417,13 +372,13 @@ class LeaveApplyAPIView(APIView):
             actionable_tl = primary_tl
 
             if not primary_tl:
-                # no assigned TL -> route to HR
+
                 route_direct_to_hr = True
             else:
-                # TL exists -> check if TL is on leave
+
                 tl_profile = getattr(primary_tl, 'employeeprofile', None)
                 if tl_profile and tl_profile.is_on_leave(start, end):
-                    # TL unavailable -> find backup TL from same department
+
                     fallback_tls = (
                         get_user_model()
                         .objects.filter(
@@ -445,19 +400,13 @@ class LeaveApplyAPIView(APIView):
                     if not found_replacement:
                         route_direct_to_hr = True
 
-        # ------------------------------------------------------------------
-        # 3. Auto-calculate leave duration
-        # ------------------------------------------------------------------
         duration_days = ser.validated_data.get('calculated_days')
         if duration_days is None:
             duration_days = (end - start).days + 1
 
-        # ------------------------------------------------------------------
-        # 4. Create LeaveRequest with correct routing
-        # ------------------------------------------------------------------
         if route_direct_to_hr:
             tl_user = None
-            initial_status = 'pending_hr'   # <-- NEW: explicitly pending HR
+            initial_status = 'pending_hr'
         else:
             tl_user = actionable_tl
             initial_status = 'applied'
@@ -473,9 +422,6 @@ class LeaveApplyAPIView(APIView):
             tl=tl_user,
         )
 
-        # ------------------------------------------------------------------
-        # 5. Notify actionable TL OR notify HR if pending_hr
-        # ------------------------------------------------------------------
         if not route_direct_to_hr and actionable_tl:
             models.Notification.objects.create(
                 to_user=actionable_tl,
@@ -486,7 +432,7 @@ class LeaveApplyAPIView(APIView):
                 extra={'leave_request_id': lr.id}
             )
         else:
-            # pending HR: notify all HR and management users
+
             hr_users = User.objects.filter(
                 role__in=['hr', 'management'], is_active=True)
             for hr_user in hr_users:
@@ -499,9 +445,6 @@ class LeaveApplyAPIView(APIView):
                     extra={'leave_request_id': lr.id}
                 )
 
-        # ------------------------------------------------------------------
-        # 6. Response
-        # ------------------------------------------------------------------
         return Response({
             "id": lr.id,
             "name": prof.full_name(),
@@ -516,9 +459,6 @@ class LeaveApplyAPIView(APIView):
         }, status=201)
 
 
-# --- HR support endpoints ---
-
-
 class HRCreateEmployeeAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHROrManagement]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -528,7 +468,7 @@ class HRCreateEmployeeAPIView(APIView):
 
         for key, value in request.data.items():
             if key in ["contact", "job", "bank", "identification"]:
-                # Parse JSON string safely
+
                 try:
                     data[key] = json.loads(value) if isinstance(
                         value, str) else value
@@ -539,28 +479,24 @@ class HRCreateEmployeeAPIView(APIView):
 
         for key, file_obj in request.FILES.items():
 
-            # contact.profile_photo
             if key.startswith("contact."):
                 field = key.split("contact.")[1]
                 if "contact" not in data or not isinstance(data["contact"], dict):
                     data["contact"] = {}
                 data["contact"][field] = file_obj
 
-            # job.id_image
             elif key.startswith("job."):
                 field = key.split("job.")[1]
                 if "job" not in data or not isinstance(data["job"], dict):
                     data["job"] = {}
                 data["job"][field] = file_obj
 
-            # identification.aadhaar_image, pan_image, passport_image
             elif key.startswith("identification."):
                 field = key.split("identification.")[1]
                 if "identification" not in data or not isinstance(data["identification"], dict):
                     data["identification"] = {}
                 data["identification"][field] = file_obj
 
-            # fallback (not expected)
             else:
                 data[key] = file_obj
 
@@ -576,17 +512,16 @@ class HRTLActionAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
     def post(self, request, leave_id):
-        action = request.data.get('action')  # 'approve' or 'reject'
+        action = request.data.get('action')
         remarks = request.data.get('remarks', '')
         lr = get_object_or_404(models.LeaveRequest, id=leave_id)
         user = request.user
 
-        # TL actions
         if user.role == 'tl':
-            # TL cannot act on their own request
+
             if lr.profile.user == user:
                 return Response({'detail': 'TL cannot approve their own leave.'}, status=403)
-            # TL can act only on fresh applied requests
+
             if lr.status != 'applied':
                 return Response({'detail': 'TL can only act on requests with status "applied".'}, status=400)
 
@@ -595,7 +530,7 @@ class HRTLActionAPIView(APIView):
 
             if action == 'approve':
                 lr.apply_tl_approval(user, approve=True, remarks=remarks)
-                # notify HR users to review (only HR/management roles)
+
                 for hr_user in User.objects.filter(role__in=['hr', 'management']):
                     models.Notification.objects.create(
                         to_user=hr_user,
@@ -616,22 +551,21 @@ class HRTLActionAPIView(APIView):
                 )
                 return Response({'detail': 'tl_rejected'})
 
-        # HR actions
         if getattr(user, 'role', None) in ('hr', 'management'):
-            # HR should act on requests that have TL approved OR pending HR
+
             if lr.status not in ('tl_approved', 'pending_hr'):
                 return Response({'detail': 'HR can only act on requests that are approved by TL or routed to HR.'}, status=400)
 
             if action == 'approve':
                 lr.apply_hr_approval(user, approve=True, remarks=remarks)
-                # deduct balance if exists
+
                 try:
                     lb = models.LeaveBalance.objects.get(
                         profile=lr.profile, leave_type__name=lr.leave_type)
                     lb.used = lb.used + lr.days
                     lb.save()
                 except Exception:
-                    # ignore if no matching balance
+
                     pass
 
                 models.Notification.objects.create(
@@ -656,34 +590,6 @@ class HRTLActionAPIView(APIView):
         return Response({'detail': 'Not allowed'}, status=403)
 
 
-
-<<<<<<< HEAD
-
-
-
-
-
-
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from django.db import transaction
-from django.utils.dateparse import parse_datetime
-
-from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
-from .serializers import (
-    TimesheetEntrySerializer,
-    TimesheetDaySerializer,
-    DailyTimesheetUpdateSerializer,
-)
-
-
-# ============================================
-# 1) GET: Daily form (today's data / summary)
-# ============================================
 class TimesheetDailyFormAPIView(APIView):
     """
     GET -> returns today's date/day, optional clock_in/out (from TimesheetDay or entries),
@@ -699,19 +605,16 @@ class TimesheetDailyFormAPIView(APIView):
 
         today = timezone.localdate()
 
-        # Ensure there is a TimesheetDay row for today
-        ts_day, _ = TimesheetDay.objects.get_or_create(profile=prof, date=today)
+        ts_day, _ = TimesheetDay.objects.get_or_create(
+            profile=prof, date=today)
 
-        # All entries for today
         entries_qs = TimesheetEntry.objects.filter(
             profile=prof,
             date=today
         ).order_by("start_time")
 
-        # Serialize entries (this will show duration_seconds as HH:MM:SS)
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        # Derive clock_in/out
         clock_in = ts_day.clock_in or (
             entries_qs.first().start_time if entries_qs.exists() else None
         )
@@ -719,7 +622,6 @@ class TimesheetDailyFormAPIView(APIView):
             entries_qs.last().end_time if entries_qs.exists() else None
         )
 
-        # Use model field duration_seconds (int) for totals
         total_seconds = sum(e.duration_seconds or 0 for e in entries_qs)
         total_hours = round(total_seconds / 3600.0, 2)
 
@@ -733,9 +635,6 @@ class TimesheetDailyFormAPIView(APIView):
         }, status=200)
 
 
-# =======================================================
-# 2) POST: update today's entries (rules in serializer)
-# =======================================================
 class TimesheetDailyUpdateAPIView(APIView):
     """
     POST -> create / replace today's entries for the logged-in employee.
@@ -760,7 +659,6 @@ class TimesheetDailyUpdateAPIView(APIView):
 
         today = timezone.localdate()
 
-        # Serializer enforces attendance rules & entry validations
         ser = DailyTimesheetUpdateSerializer(
             data=request.data,
             context={"request": request}
@@ -769,10 +667,9 @@ class TimesheetDailyUpdateAPIView(APIView):
         payload = ser.validated_data
         entries_data = payload["entries"]
 
-        # Get or create TimesheetDay (useful for reports / weekly summaries)
-        ts_day, _ = TimesheetDay.objects.get_or_create(profile=prof, date=today)
+        ts_day, _ = TimesheetDay.objects.get_or_create(
+            profile=prof, date=today)
 
-        # Replace existing entries for the day
         TimesheetEntry.objects.filter(profile=prof, date=today).delete()
         saved_objs = []
         for item in entries_data:
@@ -787,7 +684,6 @@ class TimesheetDailyUpdateAPIView(APIView):
             )
             saved_objs.append(obj)
 
-        # Optionally, set TimesheetDay clock_in/out from min/max entry times (for reporting)
         if saved_objs:
             ts_day.clock_in = min(o.start_time for o in saved_objs)
             ts_day.clock_out = max(o.end_time for o in saved_objs)
@@ -804,22 +700,6 @@ class TimesheetDailyUpdateAPIView(APIView):
             "entries": entries_out,
             "total_hours_workdone": total_hours,
         }, status=201)
-
-    
-# Replace existing TimesheetDailyForHRAPIView with this version
-# ---------- HR views: emp/views.py (paste below your existing imports/views) ----------
-from urllib.parse import unquote
-from django.utils.dateparse import parse_date, parse_datetime
-from django.shortcuts import get_object_or_404
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-
-from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
-from .serializers import TimesheetEntrySerializer, TimesheetDaySerializer
-from .permissions import IsTLorHRorOwner
 
 
 def _employee_display_name(prof):
@@ -854,10 +734,6 @@ def _employee_display_name(prof):
     return getattr(prof, "emp_id", "")
 
 
-# ---------------------------
-# HR: Daily view
-# GET /api/timesheet/hr/daily/?emp_id=...&date=YYYY-MM-DD
-# ---------------------------
 class TimesheetDailyForHRAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -883,14 +759,19 @@ class TimesheetDailyForHRAPIView(APIView):
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
 
-        ts_day = TimesheetDay.objects.filter(profile=prof, date=date_obj).first()
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date=date_obj).order_by("start_time")
+        ts_day = TimesheetDay.objects.filter(
+            profile=prof, date=date_obj).first()
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date=date_obj).order_by("start_time")
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (entries_qs.first().start_time if entries_qs.exists() else None)
-        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (entries_qs.last().end_time if entries_qs.exists() else None)
+        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (
+            entries_qs.first().start_time if entries_qs.exists() else None)
+        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (
+            entries_qs.last().end_time if entries_qs.exists() else None)
 
-        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_seconds = sum(
+            (int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
         total_hours = round(total_seconds / 3600.0, 2)
 
         return Response({
@@ -905,10 +786,6 @@ class TimesheetDailyForHRAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ---------------------------
-# HR: Monthly summary
-# GET /api/timesheet/hr/monthly/?emp_id=...&month=YYYY-MM
-# ---------------------------
 class TimesheetMonthlyForHRAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -937,7 +814,8 @@ class TimesheetMonthlyForHRAPIView(APIView):
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
 
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
 
         day_map = {}
         for entry in entries_qs:
@@ -955,7 +833,8 @@ class TimesheetMonthlyForHRAPIView(APIView):
             if entry.end_time > info["clock_out"]:
                 info["clock_out"] = entry.end_time
             try:
-                sec = int(entry.duration_seconds) if entry.duration_seconds is not None else 0
+                sec = int(
+                    entry.duration_seconds) if entry.duration_seconds is not None else 0
             except (TypeError, ValueError):
                 sec = 0
             info["total_seconds"] += sec
@@ -970,7 +849,8 @@ class TimesheetMonthlyForHRAPIView(APIView):
                 "total_hours_workdone": round(info["total_seconds"] / 3600.0, 2),
             })
 
-        month_total_seconds = sum(info["total_seconds"] for info in day_map.values())
+        month_total_seconds = sum(info["total_seconds"]
+                                  for info in day_map.values())
         month_total_hours = round(month_total_seconds / 3600.0, 2)
 
         return Response({
@@ -982,10 +862,6 @@ class TimesheetMonthlyForHRAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ---------------------------
-# HR: Worksheet (entries with IDs) for a date range
-# GET /api/timesheet/hr/worksheet/?emp_id=...&from=YYYY-MM-DD&to=YYYY-MM-DD
-# ---------------------------
 class TimesheetWorksheetForHRAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -1018,10 +894,12 @@ class TimesheetWorksheetForHRAPIView(APIView):
             return Response({"detail": "'from' must be <= 'to'."}, status=status.HTTP_400_BAD_REQUEST)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_seconds = sum(
+            (int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
         total_hours = round(total_seconds / 3600.0, 2)
 
         return Response({
@@ -1034,10 +912,6 @@ class TimesheetWorksheetForHRAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ---------------------------
-# HR: Yearly summary (12 months)
-# GET /api/timesheet/hr/yearly/?emp_id=...&year=YYYY
-# ---------------------------
 class TimesheetYearlyForHRAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -1057,10 +931,12 @@ class TimesheetYearlyForHRAPIView(APIView):
             return Response({"detail": "Invalid year. Use YYYY (e.g. 2025)."}, status=status.HTTP_400_BAD_REQUEST)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__year=year).order_by("date", "start_time")
 
         from collections import defaultdict
-        months_map = defaultdict(lambda: defaultdict(lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
+        months_map = defaultdict(lambda: defaultdict(
+            lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
 
         for e in entries_qs:
             m = e.date.month
@@ -1106,16 +982,6 @@ class TimesheetYearlyForHRAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# at top of emp/views.py add imports if missing
-from urllib.parse import unquote
-from django.utils.dateparse import parse_date, parse_datetime
-from django.shortcuts import get_object_or_404
-from rest_framework import status
-
-# import permission
-from .permissions import IsTLOnly
-
-# ---------- helper for employee display name (reuse same helper) ----------
 def _employee_display_name(prof):
     try:
         fn = getattr(prof, "full_name", None)
@@ -1147,7 +1013,6 @@ def _employee_display_name(prof):
     return getattr(prof, "emp_id", "")
 
 
-# ---------- TL: daily view (same as HR daily) ----------
 class TimesheetDailyForTLAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLOnly]
 
@@ -1169,13 +1034,18 @@ class TimesheetDailyForTLAPIView(APIView):
             return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=400)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        ts_day = TimesheetDay.objects.filter(profile=prof, date=date_obj).first()
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date=date_obj).order_by("start_time")
+        ts_day = TimesheetDay.objects.filter(
+            profile=prof, date=date_obj).first()
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date=date_obj).order_by("start_time")
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (entries_qs.first().start_time if entries_qs.exists() else None)
-        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (entries_qs.last().end_time if entries_qs.exists() else None)
-        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (
+            entries_qs.first().start_time if entries_qs.exists() else None)
+        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (
+            entries_qs.last().end_time if entries_qs.exists() else None)
+        total_seconds = sum(
+            (int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
         total_hours = round(total_seconds / 3600.0, 2)
 
         return Response({
@@ -1190,7 +1060,6 @@ class TimesheetDailyForTLAPIView(APIView):
         }, status=200)
 
 
-# ---------- TL: monthly view ----------
 class TimesheetMonthlyForTLAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLOnly]
 
@@ -1218,27 +1087,32 @@ class TimesheetMonthlyForTLAPIView(APIView):
             return Response({"detail": "Invalid month number (1..12)."}, status=400)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
 
         day_map = {}
         for entry in entries_qs:
             d = entry.date
             if d not in day_map:
-                day_map[d] = {"date": d.isoformat(), "clock_in": entry.start_time, "clock_out": entry.end_time, "total_seconds": 0}
+                day_map[d] = {"date": d.isoformat(
+                ), "clock_in": entry.start_time, "clock_out": entry.end_time, "total_seconds": 0}
             info = day_map[d]
             if entry.start_time < info["clock_in"]:
                 info["clock_in"] = entry.start_time
             if entry.end_time > info["clock_out"]:
                 info["clock_out"] = entry.end_time
-            sec = int(entry.duration_seconds) if entry.duration_seconds is not None else 0
+            sec = int(
+                entry.duration_seconds) if entry.duration_seconds is not None else 0
             info["total_seconds"] += sec
 
         days = []
         for d in sorted(day_map.keys()):
             info = day_map[d]
-            days.append({"date": info["date"], "clock_in": info["clock_in"], "clock_out": info["clock_out"], "total_hours_workdone": round(info["total_seconds"] / 3600.0, 2)})
+            days.append({"date": info["date"], "clock_in": info["clock_in"], "clock_out": info["clock_out"],
+                        "total_hours_workdone": round(info["total_seconds"] / 3600.0, 2)})
 
-        month_total_seconds = sum(info["total_seconds"] for info in day_map.values())
+        month_total_seconds = sum(info["total_seconds"]
+                                  for info in day_map.values())
         month_total_hours = round(month_total_seconds / 3600.0, 2)
 
         return Response({
@@ -1250,7 +1124,6 @@ class TimesheetMonthlyForTLAPIView(APIView):
         }, status=200)
 
 
-# ---------- TL: worksheet (entries with id) ----------
 class TimesheetWorksheetForTLAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLOnly]
 
@@ -1281,10 +1154,12 @@ class TimesheetWorksheetForTLAPIView(APIView):
             return Response({"detail": "'from' must be <= 'to'."}, status=400)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_seconds = sum(
+            (int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
         total_hours = round(total_seconds / 3600.0, 2)
 
         return Response({
@@ -1297,7 +1172,6 @@ class TimesheetWorksheetForTLAPIView(APIView):
         }, status=200)
 
 
-# ---------- TL: yearly summary ----------
 class TimesheetYearlyForTLAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLOnly]
 
@@ -1316,10 +1190,12 @@ class TimesheetYearlyForTLAPIView(APIView):
             return Response({"detail": "Invalid year. Use YYYY (e.g. 2025)."}, status=400)
 
         prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
-        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year).order_by("date", "start_time")
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof, date__year=year).order_by("date", "start_time")
 
         from collections import defaultdict
-        months_map = defaultdict(lambda: defaultdict(lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
+        months_map = defaultdict(lambda: defaultdict(
+            lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
 
         for e in entries_qs:
             m = e.date.month
@@ -1363,26 +1239,27 @@ class TimesheetYearlyForTLAPIView(APIView):
             "year_total_hours": round(year_total_seconds / 3600.0, 2),
             "months": months
         }, status=200)
-=======
+
+
 class PolicyListAPIView(generics.ListAPIView):
     queryset = models.Policy.objects.all().order_by('-created_at')
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsAuthenticated]
 
+
 class PolicyCreateAPIView(generics.CreateAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
-    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+    permission_classes = [IsHROrManagement]
 
-    
+
 class PolicyRetrieveAPIView(generics.RetrieveAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsAuthenticated]
 
+
 class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
-    permission_classes = [IsHROrManagement]  # change to HR-only if needed
-
->>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96
+    permission_classes = [IsHROrManagement]

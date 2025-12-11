@@ -1,10 +1,13 @@
-#emp/validators.py
+# emp/validators.py
 from django.core.exceptions import ValidationError
 
+
 def validate_file_size(value):
-    limit_mb = 5  # max 5 MB
+    limit_mb = 5
     if value.size > limit_mb * 1024 * 1024:
-        raise ValidationError(f'File too large. Size should not exceed {limit_mb} MB.')
+        raise ValidationError(
+            f'File too large. Size should not exceed {limit_mb} MB.')
+
 
 def validate_image_extension(value):
     valid_ext = ['.jpg', '.jpeg', '.png', '.gif', '.pdf']
