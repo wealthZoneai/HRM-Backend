@@ -49,4 +49,32 @@ urlpatterns = [
          name='hr-create-employee'),
     path('action/leave/<int:leave_id>/',
          views.HRTLActionAPIView.as_view(), name='tl-hr-leave-action'),
+
+
+
+    path('timesheet/daily/form/', views.TimesheetDailyUpdateAPIView.as_view(), name='timesheet_daily_form'),
+    path('timesheet/daily/update/', views.TimesheetDailyUpdateAPIView.as_view(), name='timesheet_daily_update'),
+    #path('timesheet/hr/daily/', views.TimesheetDailyForHRAPIView.as_view(), name='timesheet_hr_daily'),
+
+    # clock in/out endpoints
+   path('timesheet/daily/form/', views.TimesheetDailyFormAPIView.as_view(), name='timesheet_daily_form'),
+    path('timesheet/daily/update/', views.TimesheetDailyUpdateAPIView.as_view(), name='timesheet_daily_update'),
+    path('timesheet/clock-in/', views.TimesheetClockInAPIView.as_view(), name='timesheet_clock_in'),
+    path('timesheet/clock-out/', views.TimesheetClockOutAPIView.as_view(), name='timesheet_clock_out'),
+    # HR endpoints (read-only)
+    path('timesheet/hr/daily/',        views.TimesheetDailyForHRAPIView.as_view(),   name='timesheet_hr_daily'),
+    path('timesheet/hr/monthly/',      views.TimesheetMonthlyForHRAPIView.as_view(), name='timesheet_hr_monthly'),
+    path('timesheet/hr/worksheet/',    views.TimesheetWorksheetForHRAPIView.as_view(), name='timesheet_hr_worksheet'),
+    path('timesheet/hr/yearly/',       views.TimesheetYearlyForHRAPIView.as_view(),  name='timesheet_hr_yearly'),
+
+#     # Additional HR helpers (employee list / details / latest)
+#     path('timesheet/hr/employees/',    views.EmployeeListForHRAPIView.as_view(),     name='timesheet_hr_employees'),
+#     path('timesheet/hr/details/',      views.TimesheetDetailsForHRAPIView.as_view(),   name='timesheet_hr_details'),
+#     path('timesheet/hr/latest/',       views.TimesheetLatestForHRAPIView.as_view(),    name='timesheet_hr_latest'),
+
+    # TL endpoints (read-only, TL-only permission)
+    path('timesheet/tl/daily/',       views.TimesheetDailyForTLAPIView.as_view(),    name='timesheet_tl_daily'),
+    path('timesheet/tl/monthly/',     views.TimesheetMonthlyForTLAPIView.as_view(),  name='timesheet_tl_monthly'),
+    path('timesheet/tl/worksheet/',   views.TimesheetWorksheetForTLAPIView.as_view(),name='timesheet_tl_worksheet'),
+    path('timesheet/tl/yearly/',      views.TimesheetYearlyForTLAPIView.as_view(),   name='timesheet_tl_yearly'),
 ]

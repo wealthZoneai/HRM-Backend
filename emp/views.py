@@ -14,6 +14,7 @@ from . import models, serializers
 from .permissions import IsHROrManagement, IsTLorHRorOwner
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .models import Attendance
 
 User = get_user_model()
 
@@ -519,3 +520,711 @@ class HRTLActionAPIView(APIView):
                 return Response({'detail': 'hr_rejected'})
 
         return Response({'detail': 'Not allowed'}, status=403)
+
+
+
+
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db import transaction
+from django.utils.dateparse import parse_datetime
+
+from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
+from .serializers import (
+    TimesheetEntrySerializer,
+    TimesheetDaySerializer,
+    DailyTimesheetUpdateSerializer,
+)
+
+
+# ============================================
+# 1) GET: Daily form (today's data / summary)
+# ============================================
+class TimesheetDailyFormAPIView(APIView):
+    """
+    GET -> returns today's date/day, optional clock_in/out (from TimesheetDay or entries),
+    existing entries, and total hours for the day.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        prof = getattr(user, "employeeprofile", None)
+        if not prof:
+            return Response({"detail": "Employee profile not found."}, status=400)
+
+        today = timezone.localdate()
+
+        # Ensure there is a TimesheetDay row for today
+        ts_day, _ = TimesheetDay.objects.get_or_create(profile=prof, date=today)
+
+        # All entries for today
+        entries_qs = TimesheetEntry.objects.filter(
+            profile=prof,
+            date=today
+        ).order_by("start_time")
+
+        # Serialize entries (this will show duration_seconds as HH:MM:SS)
+        entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
+
+        # Derive clock_in/out
+        clock_in = ts_day.clock_in or (
+            entries_qs.first().start_time if entries_qs.exists() else None
+        )
+        clock_out = ts_day.clock_out or (
+            entries_qs.last().end_time if entries_qs.exists() else None
+        )
+
+        # Use model field duration_seconds (int) for totals
+        total_seconds = sum(e.duration_seconds or 0 for e in entries_qs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        return Response({
+            "date": today.isoformat(),
+            "day": today.strftime("%A"),
+            "clock_in": clock_in,
+            "clock_out": clock_out,
+            "existing_entries": entries_ser,
+            "total_hours_workdone": total_hours,
+        }, status=200)
+
+
+# =======================================================
+# 2) POST: update today's entries (rules in serializer)
+# =======================================================
+class TimesheetDailyUpdateAPIView(APIView):
+    """
+    POST -> create / replace today's entries for the logged-in employee.
+
+    All business rules are enforced in DailyTimesheetUpdateSerializer.validate():
+      - employee must have Attendance clock_in for today
+      - entries must be for today's date
+      - entries cannot start before Attendance.clock_in
+      - if Attendance.clock_out exists: entries cannot go beyond clock_out
+      - if Attendance.clock_out does NOT exist: entries cannot go beyond now
+      - max 6 hours per entry
+      - entries cannot overlap
+    """
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        prof = getattr(user, "employeeprofile", None)
+        if not prof:
+            return Response({"detail": "Employee profile not found."}, status=400)
+
+        today = timezone.localdate()
+
+        # Serializer enforces attendance rules & entry validations
+        ser = DailyTimesheetUpdateSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        ser.is_valid(raise_exception=True)
+        payload = ser.validated_data
+        entries_data = payload["entries"]
+
+        # Get or create TimesheetDay (useful for reports / weekly summaries)
+        ts_day, _ = TimesheetDay.objects.get_or_create(profile=prof, date=today)
+
+        # Replace existing entries for the day
+        TimesheetEntry.objects.filter(profile=prof, date=today).delete()
+        saved_objs = []
+        for item in entries_data:
+            obj = TimesheetEntry.objects.create(
+                profile=prof,
+                date=today,
+                day=today.strftime("%A"),
+                task=item["task"],
+                description=item.get("description", ""),
+                start_time=item["start_time"],
+                end_time=item["end_time"],
+            )
+            saved_objs.append(obj)
+
+        # Optionally, set TimesheetDay clock_in/out from min/max entry times (for reporting)
+        if saved_objs:
+            ts_day.clock_in = min(o.start_time for o in saved_objs)
+            ts_day.clock_out = max(o.end_time for o in saved_objs)
+            ts_day.save()
+
+        total_seconds = sum(o.duration_seconds or 0 for o in saved_objs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        entries_out = TimesheetEntrySerializer(saved_objs, many=True).data
+
+        return Response({
+            "message": "Timesheet updated successfully",
+            "date": today.isoformat(),
+            "entries": entries_out,
+            "total_hours_workdone": total_hours,
+        }, status=201)
+
+    
+# Replace existing TimesheetDailyForHRAPIView with this version
+# ---------- HR views: emp/views.py (paste below your existing imports/views) ----------
+from urllib.parse import unquote
+from django.utils.dateparse import parse_date, parse_datetime
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+
+from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
+from .serializers import TimesheetEntrySerializer, TimesheetDaySerializer
+from .permissions import IsTLorHRorOwner
+
+
+def _employee_display_name(prof):
+    """Best-effort employee display name (safe fallbacks)."""
+    try:
+        fn = getattr(prof, "full_name", None)
+        if callable(fn):
+            name = fn()
+            if name:
+                return name
+    except Exception:
+        pass
+    first = getattr(prof, "first_name", "") or ""
+    last = getattr(prof, "last_name", "") or ""
+    combined = " ".join(p for p in (first.strip(), last.strip()) if p).strip()
+    if combined:
+        return combined
+    user = getattr(prof, "user", None)
+    if user:
+        try:
+            guf = getattr(user, "get_full_name", None)
+            if callable(guf):
+                u_name = guf()
+                if u_name:
+                    return u_name
+        except Exception:
+            pass
+        if getattr(user, "username", None):
+            return user.username
+        if getattr(user, "email", None):
+            return user.email
+    return getattr(prof, "emp_id", "")
+
+
+# ---------------------------
+# HR: Daily view
+# GET /api/timesheet/hr/daily/?emp_id=...&date=YYYY-MM-DD
+# ---------------------------
+class TimesheetDailyForHRAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLorHRorOwner]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        raw_date = request.query_params.get("date")
+
+        if not raw_emp_id or not raw_date:
+            return Response({
+                "detail": "emp_id and date are required (e.g. ?emp_id=WZG-AI-0006&date=2025-12-10)."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+        date_str = unquote(str(raw_date)).strip()
+
+        date_obj = parse_date(date_str)
+        if not date_obj:
+            dt = parse_datetime(date_str)
+            if dt:
+                date_obj = dt.date()
+        if not date_obj:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+
+        ts_day = TimesheetDay.objects.filter(profile=prof, date=date_obj).first()
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date=date_obj).order_by("start_time")
+        entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
+
+        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (entries_qs.first().start_time if entries_qs.exists() else None)
+        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (entries_qs.last().end_time if entries_qs.exists() else None)
+
+        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        return Response({
+            "ok": True,
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "date": date_obj.isoformat(),
+            "clock_in": clock_in,
+            "clock_out": clock_out,
+            "entries": entries_ser,
+            "total_hours_workdone": total_hours
+        }, status=status.HTTP_200_OK)
+
+
+# ---------------------------
+# HR: Monthly summary
+# GET /api/timesheet/hr/monthly/?emp_id=...&month=YYYY-MM
+# ---------------------------
+class TimesheetMonthlyForHRAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLorHRorOwner]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        raw_month = request.query_params.get("month")
+
+        if not raw_emp_id:
+            return Response({"detail": "emp_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+        today = timezone.localdate()
+
+        if raw_month:
+            month_str = unquote(str(raw_month)).strip()
+            try:
+                year, month = map(int, month_str.split("-"))
+            except Exception:
+                return Response({"detail": "Invalid month format. Use YYYY-MM."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            year = today.year
+            month = today.month
+
+        if not (1 <= month <= 12):
+            return Response({"detail": "Invalid month number (1..12)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
+
+        day_map = {}
+        for entry in entries_qs:
+            d = entry.date
+            if d not in day_map:
+                day_map[d] = {
+                    "date": d.isoformat(),
+                    "clock_in": entry.start_time,
+                    "clock_out": entry.end_time,
+                    "total_seconds": 0,
+                }
+            info = day_map[d]
+            if entry.start_time < info["clock_in"]:
+                info["clock_in"] = entry.start_time
+            if entry.end_time > info["clock_out"]:
+                info["clock_out"] = entry.end_time
+            try:
+                sec = int(entry.duration_seconds) if entry.duration_seconds is not None else 0
+            except (TypeError, ValueError):
+                sec = 0
+            info["total_seconds"] += sec
+
+        days = []
+        for d in sorted(day_map.keys()):
+            info = day_map[d]
+            days.append({
+                "date": info["date"],
+                "clock_in": info["clock_in"],
+                "clock_out": info["clock_out"],
+                "total_hours_workdone": round(info["total_seconds"] / 3600.0, 2),
+            })
+
+        month_total_seconds = sum(info["total_seconds"] for info in day_map.values())
+        month_total_hours = round(month_total_seconds / 3600.0, 2)
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "month": f"{year}-{month:02d}",
+            "total_hours_workdone": month_total_hours,
+            "days": days,
+        }, status=status.HTTP_200_OK)
+
+
+# ---------------------------
+# HR: Worksheet (entries with IDs) for a date range
+# GET /api/timesheet/hr/worksheet/?emp_id=...&from=YYYY-MM-DD&to=YYYY-MM-DD
+# ---------------------------
+class TimesheetWorksheetForHRAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLorHRorOwner]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        from_q = request.query_params.get("from")
+        to_q = request.query_params.get("to")
+
+        if not raw_emp_id:
+            return Response({"detail": "emp_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+
+        try:
+            d_from = parse_date(from_q) if from_q else None
+            d_to = parse_date(to_q) if to_q else None
+        except Exception:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        today = timezone.localdate()
+        if not d_from and not d_to:
+            d_from = today.replace(day=1)
+            d_to = today
+        elif d_from and not d_to:
+            d_to = d_from
+        elif d_to and not d_from:
+            d_from = d_to
+
+        if d_from > d_to:
+            return Response({"detail": "'from' must be <= 'to'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
+        entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
+
+        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "from": d_from.isoformat(),
+            "to": d_to.isoformat(),
+            "total_hours": total_hours,
+            "entries": entries_ser
+        }, status=status.HTTP_200_OK)
+
+
+# ---------------------------
+# HR: Yearly summary (12 months)
+# GET /api/timesheet/hr/yearly/?emp_id=...&year=YYYY
+# ---------------------------
+class TimesheetYearlyForHRAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLorHRorOwner]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        raw_year = request.query_params.get("year")
+
+        if not raw_emp_id or not raw_year:
+            return Response({"detail": "emp_id and year are required (YYYY)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+        try:
+            year = int(raw_year)
+            if year < 1900 or year > 9999:
+                raise ValueError()
+        except Exception:
+            return Response({"detail": "Invalid year. Use YYYY (e.g. 2025)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year).order_by("date", "start_time")
+
+        from collections import defaultdict
+        months_map = defaultdict(lambda: defaultdict(lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
+
+        for e in entries_qs:
+            m = e.date.month
+            d = e.date.isoformat()
+            info = months_map[m][d]
+            info["entries"].append(TimesheetEntrySerializer(e).data)
+            sec = int(e.duration_seconds) if e.duration_seconds is not None else 0
+            info["total_seconds"] += sec
+            if info["clock_in"] is None or e.start_time < info["clock_in"]:
+                info["clock_in"] = e.start_time
+            if info["clock_out"] is None or e.end_time > info["clock_out"]:
+                info["clock_out"] = e.end_time
+
+        months = []
+        year_total_seconds = 0
+        for month_num in range(1, 13):
+            month_days = months_map.get(month_num, {})
+            days_list = []
+            month_total_seconds = 0
+            for d_iso in sorted(month_days.keys()):
+                info = month_days[d_iso]
+                month_total_seconds += info["total_seconds"]
+                days_list.append({
+                    "date": d_iso,
+                    "clock_in": info["clock_in"],
+                    "clock_out": info["clock_out"],
+                    "total_hours": round(info["total_seconds"] / 3600.0, 2),
+                    "entries_count": len(info["entries"]),
+                })
+            months.append({
+                "month": f"{timezone.datetime(year, month_num, 1).strftime('%Y-%m')}",
+                "total_hours": round(month_total_seconds / 3600.0, 2),
+                "days": days_list
+            })
+            year_total_seconds += month_total_seconds
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "year": str(year),
+            "year_total_hours": round(year_total_seconds / 3600.0, 2),
+            "months": months
+        }, status=status.HTTP_200_OK)
+
+
+# at top of emp/views.py add imports if missing
+from urllib.parse import unquote
+from django.utils.dateparse import parse_date, parse_datetime
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+
+# import permission
+from .permissions import IsTLOnly
+
+# ---------- helper for employee display name (reuse same helper) ----------
+def _employee_display_name(prof):
+    try:
+        fn = getattr(prof, "full_name", None)
+        if callable(fn):
+            name = fn()
+            if name:
+                return name
+    except Exception:
+        pass
+    first = getattr(prof, "first_name", "") or ""
+    last = getattr(prof, "last_name", "") or ""
+    combined = " ".join(p for p in (first.strip(), last.strip()) if p).strip()
+    if combined:
+        return combined
+    user = getattr(prof, "user", None)
+    if user:
+        try:
+            guf = getattr(user, "get_full_name", None)
+            if callable(guf):
+                u_name = guf()
+                if u_name:
+                    return u_name
+        except Exception:
+            pass
+        if getattr(user, "username", None):
+            return user.username
+        if getattr(user, "email", None):
+            return user.email
+    return getattr(prof, "emp_id", "")
+
+
+# ---------- TL: daily view (same as HR daily) ----------
+class TimesheetDailyForTLAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLOnly]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        raw_date = request.query_params.get("date")
+        if not raw_emp_id or not raw_date:
+            return Response({"detail": "emp_id and date are required (YYYY-MM-DD)."}, status=400)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+        date_str = unquote(str(raw_date)).strip()
+
+        date_obj = parse_date(date_str)
+        if not date_obj:
+            dt = parse_datetime(date_str)
+            if dt:
+                date_obj = dt.date()
+        if not date_obj:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        ts_day = TimesheetDay.objects.filter(profile=prof, date=date_obj).first()
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date=date_obj).order_by("start_time")
+        entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
+
+        clock_in = ts_day.clock_in if ts_day and ts_day.clock_in else (entries_qs.first().start_time if entries_qs.exists() else None)
+        clock_out = ts_day.clock_out if ts_day and ts_day.clock_out else (entries_qs.last().end_time if entries_qs.exists() else None)
+        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        return Response({
+            "ok": True,
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "date": date_obj.isoformat(),
+            "clock_in": clock_in,
+            "clock_out": clock_out,
+            "entries": entries_ser,
+            "total_hours_workdone": total_hours
+        }, status=200)
+
+
+# ---------- TL: monthly view ----------
+class TimesheetMonthlyForTLAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLOnly]
+
+    def get(self, request):
+        raw_emp_id = request.query_params.get("emp_id")
+        raw_month = request.query_params.get("month")
+
+        if not raw_emp_id:
+            return Response({"detail": "emp_id is required."}, status=400)
+
+        emp_id = unquote(str(raw_emp_id)).strip()
+        today = timezone.localdate()
+
+        if raw_month:
+            month_str = unquote(str(raw_month)).strip()
+            try:
+                year, month = map(int, month_str.split("-"))
+            except Exception:
+                return Response({"detail": "Invalid month format. Use YYYY-MM."}, status=400)
+        else:
+            year = today.year
+            month = today.month
+
+        if not (1 <= month <= 12):
+            return Response({"detail": "Invalid month number (1..12)."}, status=400)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year, date__month=month).order_by("date", "start_time")
+
+        day_map = {}
+        for entry in entries_qs:
+            d = entry.date
+            if d not in day_map:
+                day_map[d] = {"date": d.isoformat(), "clock_in": entry.start_time, "clock_out": entry.end_time, "total_seconds": 0}
+            info = day_map[d]
+            if entry.start_time < info["clock_in"]:
+                info["clock_in"] = entry.start_time
+            if entry.end_time > info["clock_out"]:
+                info["clock_out"] = entry.end_time
+            sec = int(entry.duration_seconds) if entry.duration_seconds is not None else 0
+            info["total_seconds"] += sec
+
+        days = []
+        for d in sorted(day_map.keys()):
+            info = day_map[d]
+            days.append({"date": info["date"], "clock_in": info["clock_in"], "clock_out": info["clock_out"], "total_hours_workdone": round(info["total_seconds"] / 3600.0, 2)})
+
+        month_total_seconds = sum(info["total_seconds"] for info in day_map.values())
+        month_total_hours = round(month_total_seconds / 3600.0, 2)
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "month": f"{year}-{month:02d}",
+            "total_hours_workdone": month_total_hours,
+            "days": days
+        }, status=200)
+
+
+# ---------- TL: worksheet (entries with id) ----------
+class TimesheetWorksheetForTLAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLOnly]
+
+    def get(self, request):
+        emp_id = request.query_params.get("emp_id")
+        from_q = request.query_params.get("from")
+        to_q = request.query_params.get("to")
+
+        if not emp_id:
+            return Response({"detail": "emp_id is required."}, status=400)
+
+        try:
+            d_from = parse_date(from_q) if from_q else None
+            d_to = parse_date(to_q) if to_q else None
+        except Exception:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+        today = timezone.localdate()
+        if not d_from and not d_to:
+            d_from = today.replace(day=1)
+            d_to = today
+        elif d_from and not d_to:
+            d_to = d_from
+        elif d_to and not d_from:
+            d_from = d_to
+
+        if d_from > d_to:
+            return Response({"detail": "'from' must be <= 'to'."}, status=400)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__gte=d_from, date__lte=d_to).order_by("date", "start_time")
+        entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
+
+        total_seconds = sum((int(e.duration_seconds) if e.duration_seconds is not None else 0) for e in entries_qs)
+        total_hours = round(total_seconds / 3600.0, 2)
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "from": d_from.isoformat(),
+            "to": d_to.isoformat(),
+            "total_hours": total_hours,
+            "entries": entries_ser
+        }, status=200)
+
+
+# ---------- TL: yearly summary ----------
+class TimesheetYearlyForTLAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTLOnly]
+
+    def get(self, request):
+        emp_id = request.query_params.get("emp_id")
+        year_q = request.query_params.get("year")
+
+        if not emp_id or not year_q:
+            return Response({"detail": "emp_id and year are required (YYYY)."}, status=400)
+
+        try:
+            year = int(year_q)
+            if year < 1900 or year > 9999:
+                raise ValueError()
+        except Exception:
+            return Response({"detail": "Invalid year. Use YYYY (e.g. 2025)."}, status=400)
+
+        prof = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+        entries_qs = TimesheetEntry.objects.filter(profile=prof, date__year=year).order_by("date", "start_time")
+
+        from collections import defaultdict
+        months_map = defaultdict(lambda: defaultdict(lambda: {"entries": [], "total_seconds": 0, "clock_in": None, "clock_out": None}))
+
+        for e in entries_qs:
+            m = e.date.month
+            d = e.date.isoformat()
+            info = months_map[m][d]
+            info["entries"].append(TimesheetEntrySerializer(e).data)
+            sec = int(e.duration_seconds) if e.duration_seconds is not None else 0
+            info["total_seconds"] += sec
+            if info["clock_in"] is None or e.start_time < info["clock_in"]:
+                info["clock_in"] = e.start_time
+            if info["clock_out"] is None or e.end_time > info["clock_out"]:
+                info["clock_out"] = e.end_time
+
+        months = []
+        year_total_seconds = 0
+        for month_num in range(1, 13):
+            month_days = months_map.get(month_num, {})
+            days_list = []
+            month_total_seconds = 0
+            for d_iso in sorted(month_days.keys()):
+                info = month_days[d_iso]
+                month_total_seconds += info["total_seconds"]
+                days_list.append({
+                    "date": d_iso,
+                    "clock_in": info["clock_in"],
+                    "clock_out": info["clock_out"],
+                    "total_hours": round(info["total_seconds"] / 3600.0, 2),
+                    "entries_count": len(info["entries"]),
+                })
+            months.append({
+                "month": f"{timezone.datetime(year, month_num, 1).strftime('%Y-%m')}",
+                "total_hours": round(month_total_seconds / 3600.0, 2),
+                "days": days_list
+            })
+            year_total_seconds += month_total_seconds
+
+        return Response({
+            "employee": _employee_display_name(prof),
+            "emp_id": prof.emp_id,
+            "year": str(year),
+            "year_total_hours": round(year_total_seconds / 3600.0, 2),
+            "months": months
+        }, status=200)
