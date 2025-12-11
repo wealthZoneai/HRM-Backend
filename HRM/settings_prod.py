@@ -36,7 +36,7 @@ else:
 DATABASES = {
     "default": dj_database_url.config(
         default=os.environ.get(
-            "DATABASE_URL=postgresql://postgres:Hrms-portal$2025@hrms-portal-db.cmncis6y60g6.us-east-1.rds.amazonaws.com:5432/Hrms-portal-db"),
+            "DATABASE_URL=postgresql://hrmuser:strongpassword123!@hrms-portal-db.cmncis6y60g6.us-east-1.rds.amazonaws.com:5432/hrmdb"),
         conn_max_age=600,
         ssl_require=True
     )

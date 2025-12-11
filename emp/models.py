@@ -98,6 +98,7 @@ class EmployeeProfile(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='assigned_employees'
     )
+
     def team_lead_display(self):
         if self.team_lead:
             return f"{self.team_lead.first_name} {self.team_lead.last_name}".strip() or self.team_lead.username
@@ -198,25 +199,25 @@ class Shift(models.Model):
 
 class Attendance(models.Model):
     STATUS_CHOICES = [
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('manual', 'Manual'),
+        ('working', 'Working'),
+        ('present', 'Present'),
+        ('halfday', 'Half Day'),
+        ('absent', 'Absent'),
     ]
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='attendances')
     date = models.DateField()
-    shift = models.ForeignKey(
-        Shift, null=True, blank=True, on_delete=models.SET_NULL)
+    # shift = models.ForeignKey(Shift, null=True, blank=True, on_delete=models.SET_NULL)
     clock_in = models.DateTimeField()
     clock_out = models.DateTimeField(null=True, blank=True)
-    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    duration_time = models.CharField(max_length=20, null=True, blank=True)
     status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default='in_progress')
-    is_remote = models.BooleanField(default=False)
-    late_by_seconds = models.PositiveIntegerField(null=True, blank=True)
-    overtime_seconds = models.PositiveIntegerField(null=True, blank=True)
-    note = models.TextField(null=True, blank=True)
-    manual_entry = models.BooleanField(default=False)
+        max_length=20, choices=STATUS_CHOICES, default='working')
+    # is_remote = models.BooleanField(default=False)
+    # late_by_seconds = models.PositiveIntegerField(null=True, blank=True)
+    # overtime_seconds = models.PositiveIntegerField(null=True, blank=True)
+    # note = models.TextField(null=True, blank=True)
+    # manual_entry = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -226,31 +227,26 @@ class Attendance(models.Model):
 
     def compute_duration_and_overtime(self, standard_seconds=9*3600):
         """
-        Calculate duration_seconds and overtime_seconds automatically.
-        Default standard_seconds = 9 hours.
+        Calculate duration_time and overtime_seconds automatically.
+        Default standard_time = 9 hours.
         """
-        if self.clock_in and self.clock_out:
-            delta = self.clock_out - self.clock_in
-            self.duration_seconds = int(delta.total_seconds())
-            if self.duration_seconds > standard_seconds:
-                self.overtime_seconds = self.duration_seconds - standard_seconds
-            else:
-                self.overtime_seconds = 0
-            # compute late_by_seconds if shift is set
-            if self.shift and self.shift.start_time:
-                # convert shift start_time to timezone-aware datetime for this date
-                dt_shift_start = timezone.make_aware(timezone.datetime.combine(
-                    self.date, self.shift.start_time), timezone.get_current_timezone())
-                clk_in_local = timezone.localtime(self.clock_in)
-                if clk_in_local > dt_shift_start:
-                    self.late_by_seconds = int(
-                        (clk_in_local - dt_shift_start).total_seconds())
-                else:
-                    self.late_by_seconds = 0
-            self.save(update_fields=['duration_seconds',
-                      'overtime_seconds', 'late_by_seconds'])
-            return self.duration_seconds
-        return None
+        if not self.clock_in or not self.clock_out:
+            return
+        delta = self.clock_out - self.clock_in
+        total_seconds = int(delta.total_seconds())
+        hrs = total_seconds // 3600
+        mins = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        self.duration_time = f"{hrs:02}:{mins:02}:{secs:02}"
+        hours = total_seconds / 3600
+        if hours >= 9:
+            self.status = 'present'
+        elif 2 <= hours < 9:
+            self.status = 'halfday'
+        elif hours < 2:
+            self.status = 'absent'
+        else:
+            self.status = 'working'
 
 
 # -----------------------
@@ -438,8 +434,8 @@ class Policy(models.Model):
     title = models.CharField(max_length=250)
     policy_type = models.CharField(
         max_length=50, choices=POLICY_TYPES, default='policy')
-    content = models.TextField()
-    file = models.FileField(upload_to='policies/', null=True, blank=True)
+    description = models.TextField()
+    # file = models.FileField(upload_to='policies/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

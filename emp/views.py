@@ -115,7 +115,7 @@ class DashboardSummaryAPIView(APIView):
         qs = models.Attendance.objects.filter(
             user=user, date__year=y, date__month=m, status='completed')
         days_present = qs.count()
-        total_seconds = qs.aggregate(total=Sum('duration_seconds'))[
+        total_seconds = qs.aggregate(total=Sum('duration_time'))[
             'total'] or 0
         monthly_summary = {'year': y, 'month': m, 'days_present': days_present, 'hours': round(
             total_seconds/3600, 2)}
@@ -153,14 +153,15 @@ class ClockInAPIView(APIView):
     def post(self, request):
         user = request.user
         today = timezone.localdate()
+
         if models.Attendance.objects.filter(user=user, date=today).exists():
             return Response({"detail": "Attendance for today already exists."}, status=400)
-        shift_id = request.data.get('shift')
-        shift = None
-        if shift_id:
-            shift = get_object_or_404(models.Shift, id=shift_id)
-        att = models.Attendance.objects.create(user=user, date=today, shift=shift, clock_in=timezone.now(
-        ), status='in_progress', note=request.data.get('note', ''))
+        # shift_id = request.data.get('shift')
+        # shift = None
+        # if shift_id:
+        #     shift = get_object_or_404(models.Shift, id=shift_id)
+        att = models.Attendance.objects.create(user=user, date=today, clock_in=timezone.now(
+        ), status='working')
         return Response(serializers.AttendanceReadSerializer(att).data, status=201)
 
 
@@ -176,7 +177,6 @@ class ClockOutAPIView(APIView):
         if att.clock_out:
             return Response({"detail": "Already clocked out."}, status=400)
         att.clock_out = timezone.now()
-        att.status = 'completed'
         att.compute_duration_and_overtime()
         att.save()
         return Response(serializers.AttendanceReadSerializer(att).data)
@@ -649,3 +649,27 @@ class HRTLActionAPIView(APIView):
                 return Response({'detail': 'hr_rejected'})
 
         return Response({'detail': 'Not allowed'}, status=403)
+
+
+
+class PolicyListAPIView(generics.ListAPIView):
+    queryset = models.Policy.objects.all().order_by('-created_at')
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsAuthenticated]
+
+class PolicyCreateAPIView(generics.CreateAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+
+    
+class PolicyRetrieveAPIView(generics.RetrieveAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsAuthenticated]
+
+class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+

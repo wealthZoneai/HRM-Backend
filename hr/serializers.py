@@ -56,7 +56,7 @@ class AttendanceAdminSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
     class Meta:
         model = Attendance
-        fields = ('id','user','date','shift','clock_in','clock_out','duration_seconds','status','is_remote','late_by_seconds','overtime_seconds','note','manual_entry')
+        fields = '__all__'
 
 # Calendar event (HR create)
 class CalendarEventSerializer(serializers.ModelSerializer):
