@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance
 from django.contrib.auth import get_user_model
+from .models import Announcement
 
 User = get_user_model()
 
@@ -55,7 +56,7 @@ class AttendanceAdminSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
     class Meta:
         model = Attendance
-        fields = ('id','user','date','shift','clock_in','clock_out','duration_seconds','status','is_remote','late_by_seconds','overtime_seconds','note','manual_entry')
+        fields = '__all__'
 
 # Calendar event (HR create)
 class CalendarEventSerializer(serializers.ModelSerializer):
@@ -99,3 +100,23 @@ class LeaveRequestAdminSerializer(serializers.ModelSerializer):
         model = LeaveRequest
         fields = '__all__'
 
+
+        
+from rest_framework import serializers
+from .models import Announcement
+
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = '__all__'  
+        read_only_fields = ('created_by', 'date') 
+
+
+
+class TLAnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = '__all__'
+    

@@ -1,7 +1,6 @@
 # emp/views.py
 import json
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
@@ -14,10 +13,33 @@ from . import models, serializers
 from .permissions import IsHROrManagement, IsTLorHRorOwner
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+<<<<<<< HEAD
 from .models import Attendance
 
+=======
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from hr.models import Announcement
+from hr.serializers import AnnouncementSerializer
+from .models import Notification
+from .serializers import NotificationSerializer
+from tl.models import TLAnnouncement
+from .models import EmployeeProfile
+from tl.serializers import TLAnnouncementSerializer
+>>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96
 User = get_user_model()
+from tl.serializers import TLAnnouncementSerializer
 
+# If you have a TL-specific announcement serializer, import it; otherwise fallback to AnnouncementSerializer
+try:
+    from hr.serializers import TLAnnouncementSerializer
+    TL_ANNOUNCEMENT_SERIALIZER = TLAnnouncementSerializer
+except Exception:
+    TL_ANNOUNCEMENT_SERIALIZER = AnnouncementSerializer
+
+# from hr.models import Announcement
+User = get_user_model()
+from django.shortcuts import render
 # --- Profile ---
 
 
@@ -98,7 +120,7 @@ class DashboardSummaryAPIView(APIView):
         qs = models.Attendance.objects.filter(
             user=user, date__year=y, date__month=m, status='completed')
         days_present = qs.count()
-        total_seconds = qs.aggregate(total=Sum('duration_seconds'))[
+        total_seconds = qs.aggregate(total=Sum('duration_time'))[
             'total'] or 0
         monthly_summary = {'year': y, 'month': m, 'days_present': days_present, 'hours': round(
             total_seconds/3600, 2)}
@@ -136,14 +158,15 @@ class ClockInAPIView(APIView):
     def post(self, request):
         user = request.user
         today = timezone.localdate()
+
         if models.Attendance.objects.filter(user=user, date=today).exists():
             return Response({"detail": "Attendance for today already exists."}, status=400)
-        shift_id = request.data.get('shift')
-        shift = None
-        if shift_id:
-            shift = get_object_or_404(models.Shift, id=shift_id)
-        att = models.Attendance.objects.create(user=user, date=today, shift=shift, clock_in=timezone.now(
-        ), status='in_progress', note=request.data.get('note', ''))
+        # shift_id = request.data.get('shift')
+        # shift = None
+        # if shift_id:
+        #     shift = get_object_or_404(models.Shift, id=shift_id)
+        att = models.Attendance.objects.create(user=user, date=today, clock_in=timezone.now(
+        ), status='working')
         return Response(serializers.AttendanceReadSerializer(att).data, status=201)
 
 
@@ -159,7 +182,6 @@ class ClockOutAPIView(APIView):
         if att.clock_out:
             return Response({"detail": "Already clocked out."}, status=400)
         att.clock_out = timezone.now()
-        att.status = 'completed'
         att.compute_duration_and_overtime()
         att.save()
         return Response(serializers.AttendanceReadSerializer(att).data)
@@ -193,6 +215,118 @@ class CalendarEventsAPIView(generics.ListAPIView):
         q = models.CalendarEvent.objects.filter(
             date__year=year, date__month=month)
         return q
+    
+# ----------------------------
+# EMP — VIEW ALL ANNOUNCEMENTS
+# ----------------------------
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def emp_all_announcements(request):
+    announcements = Announcement.objects.all().order_by('-date')
+    serializer = AnnouncementSerializer(announcements, many=True)
+    return Response({
+        "success": True,
+        "data": serializer.data
+    })
+
+
+# ------------------------------------------
+# EMP — VIEW ONLY THEIR NOTIFICATIONS
+# ------------------------------------------
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def emp_notifications(request):
+    notifications = Notification.objects.filter(
+        to_user=request.user
+    ).order_by('-created_at')
+
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response({
+        "success": True,
+        "data": serializer.data
+    })
+
+
+# ------------------------------------------
+# EMP — MARK ALL NOTIFICATIONS AS READ
+# ------------------------------------------
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def mark_notifications_read(request):
+    Notification.objects.filter(
+        to_user=request.user,
+        is_read=False
+    ).update(is_read=True)
+
+    return Response({
+        "success": True,
+        "message": "All notifications marked as read"
+    })
+
+
+# ------------------------------------------
+# EMP — TL ANNOUNCEMENTS (by this employee's TL)
+# ------------------------------------------
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def emp_tl_announcements(request):
+    """
+    Returns announcements created by this employee's Team Lead.
+    It supports EmployeeProfile fields named either `tl` or `team_lead`.
+    """
+    try:
+        # Lazy import to avoid circular imports if EmployeeProfile is in another app
+        from hr.models import EmployeeProfile  # adjust path if your profile lives elsewhere
+    except Exception:
+        # If EmployeeProfile not found, return informative error
+        return Response({
+            "success": False,
+            "message": "EmployeeProfile model not available (check import path)"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    try:
+        profile = EmployeeProfile.objects.get(user=request.user)
+    except EmployeeProfile.DoesNotExist:
+        return Response({
+            "success": False,
+            "message": "Employee profile not found"
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # support both possible attribute names used in different projects
+    tl = getattr(profile, "team_lead", None) or getattr(profile, "tl", None)
+
+    if tl is None:
+        return Response({
+            "success": True,
+            "data": [],
+            "message": "No Team Lead assigned"
+        }, status=status.HTTP_200_OK)
+
+    # fetch announcements created by the TL user
+    announcements = Announcement.objects.filter(created_by=tl).order_by('-date')
+    serializer = TL_ANNOUNCEMENT_SERIALIZER(announcements, many=True)
+    return Response({
+        "success": True,
+        "data": serializer.data
+    })
+
+
+class MyNotificationsList(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        notifications = Notification.objects.filter(to_user=request.user).order_by('-created_at')
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response({
+            "success": True,
+            "data": serializer.data
+        })
+
 
 # --- Payroll ---
 
@@ -523,6 +657,7 @@ class HRTLActionAPIView(APIView):
 
 
 
+<<<<<<< HEAD
 
 
 
@@ -1228,3 +1363,26 @@ class TimesheetYearlyForTLAPIView(APIView):
             "year_total_hours": round(year_total_seconds / 3600.0, 2),
             "months": months
         }, status=200)
+=======
+class PolicyListAPIView(generics.ListAPIView):
+    queryset = models.Policy.objects.all().order_by('-created_at')
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsAuthenticated]
+
+class PolicyCreateAPIView(generics.CreateAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+
+    
+class PolicyRetrieveAPIView(generics.RetrieveAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsAuthenticated]
+
+class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]  # change to HR-only if needed
+
+>>>>>>> f0404ffc95990beca8152da410fcdcdf1985aa96

@@ -11,11 +11,15 @@ from emp.models import EmployeeProfile, LeaveRequest, Attendance, CalendarEvent
 from emp.serializers import LeaveRequestSerializer, AttendanceReadSerializer, CalendarEventSerializer
 from .serializers import TeamMemberSerializer
 from .permissions import IsTL
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from hr.serializers import AnnouncementSerializer
+from hr.models import Announcement
+from hr.serializers import TLAnnouncementSerializer
+
 User = get_user_model()
 
-
 # TL: Team Members List
-
 
 class TLTeamMembersAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsTL]
@@ -138,7 +142,7 @@ class TLDashboardAPIView(APIView):
 
         total_present = attendance_qs.count()
         total_hours = attendance_qs.aggregate(
-            total=Sum("duration_seconds"))["total"] or 0
+            total=Sum("duration_time"))["total"] or 0
 
         # Upcoming meetings
         meetings = CalendarEvent.objects.filter(
@@ -174,3 +178,49 @@ class TeamLeadListAPIView(APIView):
         profiles = EmployeeProfile.objects.filter(user__in=qs)
         ser = TeamMemberSerializer(profiles, many=True)
         return Response(ser.data)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def tl_create_announcement(request):
+    """
+    TL creates announcement for their employees
+    """
+    serializer = TLAnnouncementSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(
+            created_by=request.user,
+            created_role='TL'
+        )
+        return Response({
+            "success": True,
+            "message": "Announcement created successfully",
+            "data": serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    return Response({
+        "success": False,
+        "errors": serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# tl/views.py
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import TLAnnouncement
+from hr.serializers import AnnouncementSerializer as TLAnnouncementSerializer
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def tl_create_announcement(request):
+    data = request.data.copy()
+    data['created_by'] = request.user.id  # auto assign TL
+
+    serializer = TLAnnouncementSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"success": True, "message": "Announcement created"})
+    return Response({"success": False, "errors": serializer.errors})

@@ -11,3 +11,12 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         model = EmployeeProfile
         fields = ("id","user", "emp_id", "first_name", "last_name",
                   "work_email", "job_title", "department", "profile_photo")
+
+from rest_framework import serializers
+from .models import TLAnnouncement
+
+class TLAnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TLAnnouncement
+        fields = "__all__"
+    

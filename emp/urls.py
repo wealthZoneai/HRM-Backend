@@ -10,11 +10,6 @@ urlpatterns = [
     path('my-profile/identification/', views.UpdateIdentificationView.as_view(),
          name='my-profile-identification'),
 
-    # Notifications
-    path('notifications/', views.MyNotificationsList.as_view(),
-         name='my-notifications'),
-    path('notifications/mark-read/',
-         views.MarkNotificationsRead.as_view(), name='mark-notifications'),
 
     # Dashboard
     path('dashboard/summary/', views.DashboardSummaryAPIView.as_view(),
@@ -28,6 +23,13 @@ urlpatterns = [
 
     # Calendar
     path('calendar/', views.CalendarEventsAPIView.as_view(), name='calendar'),
+
+    path("announcements/", views.emp_all_announcements, name="emp_all_announcements"),
+    path('notifications/', views.emp_notifications, name="emp_notifications"),
+
+    path('notifications/mark-read/', views.mark_notifications_read, name="mark_notifications_read"),
+     path('tl-announcements/', views.emp_tl_announcements, name='employee_tl_announcements'),
+
 
     # Payroll
     path('payroll/my-details/',
@@ -43,6 +45,11 @@ urlpatterns = [
     path('leave/my-requests/', views.MyLeaveRequestsAPIView.as_view(),
          name='my-leave-requests'),
     path('leave/apply/', views.LeaveApplyAPIView.as_view(), name='leave-apply'),
+
+    # Policies
+    path('policy/', views.PolicyListAPIView.as_view(), name='policy-list'),
+    path('policy/create/', views.PolicyCreateAPIView.as_view(), name='policy-create'),
+    path('policy/<int:pk>/', views.PolicyUpdateDeleteAPIView.as_view(), name='policy-detail'),
 
     # HR support
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
