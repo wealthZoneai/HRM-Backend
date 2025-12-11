@@ -11,7 +11,7 @@ User = settings.AUTH_USER_MODEL
 class EmployeeProfile(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='employeeprofile')
-
+   
     # System fields
     emp_id = models.CharField(max_length=20, unique=True)
     work_email = models.EmailField(unique=True)
@@ -177,7 +177,10 @@ class Notification(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-
+        
+    def __str__(self):
+        return f"{self.title} → {self.to_user}"
+ 
 # -----------------------
 # Shift & Attendance
 # -----------------------
@@ -437,3 +440,6 @@ class Policy(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+    
