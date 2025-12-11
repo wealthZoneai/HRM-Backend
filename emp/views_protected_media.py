@@ -7,7 +7,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 import os
 from .models import EmployeeProfile
-from login.models import User
 
 ALLOWED_FIELDS = {
     "aadhaar_image",

@@ -2,7 +2,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance
-from django.contrib.auth import get_user_model
 from .models import Announcement
 
 User = get_user_model()

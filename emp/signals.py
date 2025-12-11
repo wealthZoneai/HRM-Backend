@@ -3,7 +3,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from .models import EmployeeProfile, LeaveType, LeaveBalance, SalaryStructure, EmployeeSalary
+from .models import EmployeeProfile
 from django.utils.crypto import get_random_string
 from django.utils import timezone
 

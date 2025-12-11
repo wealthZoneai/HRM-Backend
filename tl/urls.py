@@ -4,17 +4,20 @@ from . import views
 
 urlpatterns = [
     path("team/members/", views.TLTeamMembersAPIView.as_view()),
+
     path("team/attendance/", views.TLTeamAttendanceAPIView.as_view()),
+
     path("team/dashboard/", views.TLDashboardAPIView.as_view()),
+
     path("tl/list/", views.TeamLeadListAPIView.as_view()),
 
-
     path("leave/pending/", views.TLPendingLeaveAPIView.as_view()),
+
     path("leave/<int:leave_id>/action/",
          views.TLApproveRejectLeaveAPIView.as_view()),
 
-
     path("calendar/create/", views.TLCreateEventAPIView.as_view()),
+
     path("announcement/create/", views.tl_create_announcement,
          name="tl-create-announcement"),
 ]

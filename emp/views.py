@@ -1,14 +1,15 @@
 # emp/views.py
 from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner
-from .serializers import TimesheetEntrySerializer, TimesheetDaySerializer
 from django.utils.dateparse import parse_date, parse_datetime
 from urllib.parse import unquote
 from .serializers import (
     TimesheetEntrySerializer,
-    TimesheetDaySerializer,
     DailyTimesheetUpdateSerializer,
+    EmployeeCreateSerializer,
+    EmployeeProfileReadSerializer,
+    NotificationSerializer,
 )
-from .models import TimesheetEntry, TimesheetDay, EmployeeProfile
+from .models import TimesheetEntry, TimesheetDay, EmployeeProfile, Notification
 from django.db import transaction
 import json
 from rest_framework.views import APIView
@@ -19,7 +20,6 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.db.models import Sum, Count
 import calendar
-from .serializers import EmployeeCreateSerializer, EmployeeProfileReadSerializer
 from . import models, serializers
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -27,9 +27,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from hr.models import Announcement
 from hr.serializers import AnnouncementSerializer
-from .models import Notification
-from .serializers import NotificationSerializer
-from tl.models import TLAnnouncement
+
 
 User = get_user_model()
 
@@ -67,6 +65,7 @@ class UpdateIdentificationView(APIView):
 
 
 class MyNotificationsList(generics.ListAPIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = serializers.NotificationSerializer
 
@@ -75,6 +74,15 @@ class MyNotificationsList(generics.ListAPIView):
         if self.request.query_params.get('unread') in ('true', '1', 'True'):
             q = q.filter(is_read=False)
         return q
+
+    def get(self, request, format=None):
+        notifications = Notification.objects.filter(
+            to_user=request.user).order_by('-created_at')
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response({
+            "success": True,
+            "data": serializer.data
+        })
 
 
 class MarkNotificationsRead(APIView):
@@ -278,20 +286,6 @@ def emp_tl_announcements(request):
         "success": True,
         "data": serializer.data
     })
-
-
-class MyNotificationsList(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, format=None):
-        notifications = Notification.objects.filter(
-            to_user=request.user).order_by('-created_at')
-        serializer = NotificationSerializer(notifications, many=True)
-        return Response({
-            "success": True,
-            "data": serializer.data
-        })
 
 
 class MySalaryDetailsAPIView(APIView):

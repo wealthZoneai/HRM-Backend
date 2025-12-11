@@ -9,11 +9,8 @@ from .models import (
     LeaveType, LeaveBalance, LeaveRequest, Policy
 )
 from django.contrib.auth import get_user_model
-from django.utils.crypto import get_random_string
 from django.utils import timezone
 from django.urls import reverse
-from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory
 
 User = get_user_model()
 

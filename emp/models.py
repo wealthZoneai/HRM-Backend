@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-import calendar
 from .validators import validate_file_size, validate_image_extension
 
 User = settings.AUTH_USER_MODEL

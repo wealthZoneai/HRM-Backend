@@ -1,7 +1,5 @@
 # tl/views.py
 from hr.serializers import AnnouncementSerializer as TLAnnouncementSerializer
-from .models import TLAnnouncement
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics, status
@@ -16,8 +14,6 @@ from .serializers import TeamMemberSerializer
 from .permissions import IsTL
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from hr.serializers import AnnouncementSerializer
-from hr.models import Announcement
 from hr.serializers import TLAnnouncementSerializer
 
 User = get_user_model()

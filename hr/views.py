@@ -1,8 +1,6 @@
 # hr/views.py
 from hr.serializers import TLAnnouncementSerializer
 from tl.models import TLAnnouncement
-from emp.models import Notification
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -11,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance
+from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance, Notification
 from . import serializers
 from .permissions import IsHR, IsTL
 from django.db.models import Sum, Count
@@ -19,7 +17,6 @@ from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
 from . import models
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from .serializers import AnnouncementSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
@@ -106,9 +103,6 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsHR]
     serializer_class = serializers.CalendarEventSerializer
     queryset = CalendarEvent.objects.all()
-
-
-User = get_user_model()
 
 
 @api_view(['POST'])
