@@ -12,6 +12,14 @@ from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
 from . import models
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from .serializers import AnnouncementSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from .models import Announcement
+from tl.serializers import TLAnnouncementSerializer
+
+
+
 
 User = get_user_model()
 
@@ -102,18 +110,168 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
     serializer_class = serializers.CalendarEventSerializer
     queryset = CalendarEvent.objects.all()
 
-# --- Salary / Payslip admin ---
+
+# hr/views.py
+
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.response import Response
+from rest_framework import status
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+from .models import Announcement
+from .serializers import AnnouncementSerializer
+
+from emp.models import Notification
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 
+# --------------------------------------------------------
+# 1. CREATE ANNOUNCEMENT  (POST)
+# --------------------------------------------------------
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_announcement(request):
+    serializer = AnnouncementSerializer(data=request.data)
+    if serializer.is_valid():
+        announcement = serializer.save(created_by=request.user)
+
+        # ---- CREATE NOTIFICATIONS HERE ----
+        employees = User.objects.filter(role__icontains="emp")
+
+        for emp in employees:
+            Notification.objects.create(
+                to_user=emp,
+                title=f"New Announcement: {announcement.title}",
+                body=f"HR added a new announcement: {announcement.title}",
+                notif_type="announcement",
+                extra={"announcement_id": announcement.id}
+            )
+        # -------------------------------------
+
+        return Response({
+            "success": True,
+            "message": "Announcement created successfully",
+            "data": serializer.data
+        })
+
+
+
+# --------------------------------------------------------
+# 2. LIST ANNOUNCEMENTS (GET)
+# --------------------------------------------------------
+@csrf_exempt
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def list_announcements(request):
+    announcements = Announcement.objects.all().order_by("-date")
+    serializer = AnnouncementSerializer(announcements, many=True)
+    return Response({
+        "success": True,
+        "data": serializer.data
+    })
+
+
+# --------------------------------------------------------
+# 3. UPDATE ANNOUNCEMENT (PUT/PATCH)
+# --------------------------------------------------------
+@api_view(['PUT', 'PATCH'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def update_announcement(request, pk):
+    try:
+        announce = Announcement.objects.get(pk=pk)
+    except Announcement.DoesNotExist:
+        return Response({"error": "Announcement not found"}, status=404)
+
+    serializer = AnnouncementSerializer(announce, data=request.data, partial=True)
+    if serializer.is_valid():
+        announcement = serializer.save()
+
+        # ---- CREATE NOTIFICATIONS HERE ----
+        employees = User.objects.filter(role__icontains="emp")
+
+        for emp in employees:
+            Notification.objects.create(
+                to_user=emp,
+                title="Announcement Updated",
+                body=f"The announcement '{announcement.title}' was updated.",
+                notif_type="announcement",
+                extra={"announcement_id": announcement.id}
+            )
+        # -------------------------------------
+
+        return Response({"success": True, "data": serializer.data})
+
+
+
+# --------------------------------------------------------
+# 4. DELETE ANNOUNCEMENT (DELETE)
+# --------------------------------------------------------
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_announcement(request, pk):
+    try:
+        announce = Announcement.objects.get(pk=pk)
+    except Announcement.DoesNotExist:
+        return Response({"error": "Announcement not found"}, status=404)
+
+    title = announce.title
+    announce.delete()
+
+    # ---- CREATE NOTIFICATIONS HERE ----
+    employees = User.objects.filter(role__icontains="emp")
+
+    for emp in employees:
+        Notification.objects.create(
+            to_user=emp,
+            title="Announcement Deleted",
+            body=f"The announcement '{title}' was deleted.",
+            notif_type="announcement"
+        )
+    # -------------------------------------
+
+    return Response({"success": True, "message": "Deleted successfully"})
+
+
+
+
+from tl.models import TLAnnouncement
+from hr.serializers import TLAnnouncementSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def emp_tl_announcements(request):
+    profile = EmployeeProfile.objects.get(user=request.user)
+
+    # Employee’s assigned Team Lead
+    tl = profile.team_lead
+
+    if tl is None:
+        return Response({"message": "No Team Lead assigned"}, status=200)
+
+    announcements = TLAnnouncement.objects.filter(created_by=tl)
+    serializer = TLAnnouncementSerializer(announcements, many=True)
+
+    return Response(serializer.data)
+
+
+# --- Salary / Payslip admin --- 
 class SalaryStructureListCreateAPIView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsHR]
     serializer_class = serializers.SalaryStructureSerializer
     queryset = SalaryStructure.objects.all()
-
-
+ 
+ 
 class EmployeeSalaryAssignAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
-
+ 
     def post(self, request, profile_id):
         prof = get_object_or_404(EmployeeProfile, id=profile_id)
         struct_id = request.data.get('structure_id')
@@ -122,29 +280,29 @@ class EmployeeSalaryAssignAPIView(APIView):
         es, created = EmployeeSalary.objects.update_or_create(
             profile=prof, defaults={'structure': struct, 'effective_from': eff_from})
         return Response(serializers.EmployeeSalaryAdminSerializer(es).data)
-
-
+ 
+ 
 class HRGeneratePayslipAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
-
+ 
     def post(self, request, profile_id):
         # body: year, month, force (bool)
         profile = get_object_or_404(EmployeeProfile, id=profile_id)
         year = int(request.data.get('year', timezone.localdate().year))
         month = int(request.data.get('month', timezone.localdate().month))
         force = bool(request.data.get('force', False))
-
+ 
         # validate salary assigned
         try:
             es = profile.salary
         except EmployeeSalary.DoesNotExist:
             return Response({"detail": "No salary assigned"}, status=400)
-
+ 
         # working days (Mon-Fri)
         cal = calendar.Calendar()
         working_days = sum(1 for d in cal.itermonthdays2(
             year, month) if d[0] != 0 and d[1] < 5)
-
+ 
         attend_qs = Attendance.objects.filter(
             user=profile.user, date__year=year, date__month=month, status='completed')
         days_present = attend_qs.count()
@@ -152,19 +310,19 @@ class HRGeneratePayslipAPIView(APIView):
             total=Sum('duration_seconds'))['total'] or 0
         overtime_seconds = attend_qs.aggregate(
             total=Sum('overtime_seconds'))['total'] or 0
-
+ 
         gross = float(es.structure.monthly_ctc)
         prorata = gross * \
             (days_present / working_days) if working_days else 0.0
-
+ 
         hourly_rate = es.hourly_rate(working_days_in_month=working_days)
         overtime_amt = (overtime_seconds / 3600.0) * \
             hourly_rate * float(es.structure.overtime_multiplier)
-
+ 
         # HR can pass extra deductions
         deductions = float(request.data.get('deductions', 0.0))
         net = prorata + overtime_amt - deductions
-
+ 
         payslip, created = Payslip.objects.update_or_create(
             profile=profile, year=year, month=month,
             defaults={

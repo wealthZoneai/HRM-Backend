@@ -1,6 +1,8 @@
 # hr/urls.py
 from django.urls import path
 from . import views
+from hr import views
+from .views import update_announcement, delete_announcement
 
 urlpatterns = [
     # Employee management
@@ -28,6 +30,12 @@ urlpatterns = [
     path('calendar/create/', views.HRCalendarCreateAPIView.as_view(),
          name='hr-calendar-create'),
 
+
+     path("announcement/create/", views.create_announcement, name="api_create_announcement"),
+     path('announcement/list/', views.list_announcements), 
+     path('announcement/<int:pk>/update/', views.update_announcement, name='update-announcement'),
+     path('announcement/<int:pk>/delete/', views.delete_announcement, name='delete-announcement'),
+     path("tl-announcements/", views.emp_tl_announcements, name="emp_tl_announcements"),
     # Salary & payslip
     path('salary-structures/', views.SalaryStructureListCreateAPIView.as_view(),
          name='hr-salary-structures'),
