@@ -9,6 +9,7 @@ class TLAnnouncement(models.Model):
     date = models.DateField()
     time = models.TimeField()
     priority = models.CharField(max_length=10)
+    created_role = models.CharField(max_length=20, default="TL")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

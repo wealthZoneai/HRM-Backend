@@ -4,6 +4,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import PasswordResetOTP
 from .utils import generate_otp, send_otp_email
+from django.db import transaction
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 User = get_user_model()
 
@@ -46,13 +49,23 @@ class ForgotPasswordSerializer(serializers.Serializer):
         user = User.objects.filter(email=email).first()
 
         if not user:
-            raise serializers.ValidationError({"email": "Email not found."})
+            return {"email": email}
+        
+        existing = PasswordResetOTP.objects.filter(user=user, is_used=False).order_by('-id').first()
+        if existing and not existing.is_expired():
+            return {"email": email}
 
         otp = generate_otp()
         PasswordResetOTP.objects.create(user=user, otp=otp)
-        send_otp_email(email, otp)
+        
+        try:
+            send_otp_email(email, otp)
+        except Exception:
+            pass
 
         return {"email": email}
+
+
 
 
 class VerifyOTPSerializer(serializers.Serializer):
@@ -60,7 +73,7 @@ class VerifyOTPSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=6, min_length=6)
 
     def validate(self, data):
-        email = data["email"]
+        email = data["email"].lower()
         otp = data["otp"]
 
         user = User.objects.filter(email=email).first()
@@ -69,7 +82,7 @@ class VerifyOTPSerializer(serializers.Serializer):
 
         otp_obj = PasswordResetOTP.objects.filter(
             user=user, otp=otp, is_used=False
-        ).last()
+        ).order_by('-id').first()
 
         if not otp_obj:
             raise serializers.ValidationError({"otp": "Invalid OTP."})
@@ -77,66 +90,73 @@ class VerifyOTPSerializer(serializers.Serializer):
         if otp_obj.is_expired():
             raise serializers.ValidationError({"otp": "OTP expired."})
 
+        # keep otp_obj for potential downstream use
         data["user"] = user
         data["otp_obj"] = otp_obj
         return data
 
     def create(self, validated_data):
-        email = validated_data["email"]
-        otp = validated_data["otp"]
-
-        otp_obj = PasswordResetOTP.objects.filter(
-            user__email=email).latest('id')
-
-        if otp_obj.otp != otp:
-            raise serializers.ValidationError({"otp": "Invalid OTP"})
-
-    # Return value must include all serializer fields (email, otp)
+        # Mark OTP as used to prevent replay
+        otp_obj = validated_data.get("otp_obj")
+        if otp_obj:
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=["is_used"])
         return {
-            "email": email,
-            "otp": otp
+            "email": validated_data["email"],
+            "otp": validated_data["otp"]
         }
 
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6, min_length=6)
     new_password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        # Password checks
         if data["new_password"] != data["confirm_password"]:
             raise serializers.ValidationError(
                 {"confirm_password": "Passwords do not match"}
             )
 
         pwd = data["new_password"]
+        try:
+            validate_password(pwd, user=None)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"new_password": list(e.messages)})
 
-        if len(pwd) < 8:
-            raise serializers.ValidationError(
-                {"new_password": "Min 8 characters"})
-        if not any(c.isdigit() for c in pwd):
-            raise serializers.ValidationError(
-                {"new_password": "Must include a number"})
-        if not any(c.isupper() for c in pwd):
-            raise serializers.ValidationError(
-                {"new_password": "Must include uppercase"})
-        if not any(c.islower() for c in pwd):
-            raise serializers.ValidationError(
-                {"new_password": "Must include lowercase"})
-        if not any(c in "!@#$%^&*()_+{}[]|:;'<>,.?/" for c in pwd):
-            raise serializers.ValidationError(
-                {"new_password": "Must include special"})
-
-        return data
-
-    def create(self, validated_data):
-        user = User.objects.filter(email=validated_data["email"]).first()
+        # OTP verification
+        email = data["email"].lower()
+        otp = data["otp"]
+        user = User.objects.filter(email=email).first()
         if not user:
             raise serializers.ValidationError({"email": "Email not found."})
 
-        user.set_password(validated_data["new_password"])
-        user.save()
+        otp_obj = PasswordResetOTP.objects.filter(
+            user=user, otp=otp, is_used=False
+        ).order_by('-id').first()
 
-        return {
-            "email": validated_data["email"]
-        }
+        if not otp_obj:
+            raise serializers.ValidationError({"otp": "Invalid or used OTP."})
+
+        if otp_obj.is_expired():
+            raise serializers.ValidationError({"otp": "OTP expired."})
+
+        # store references for create()
+        data["user_obj"] = user
+        data["otp_obj"] = otp_obj
+        return data
+
+    def create(self, validated_data):
+        user = validated_data["user_obj"]
+        otp_obj = validated_data["otp_obj"]
+
+        with transaction.atomic():            
+            user.set_password(validated_data["new_password"])
+            user.save(update_fields=["password"])
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=["is_used"])
+
+        return {"email": user.email}
+

@@ -6,4 +6,5 @@ class IsTL(permissions.BasePermission):
     """Allow only Team Leaders."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == "tl")
+        role = getattr(request.user, "role", "") or ""
+        return bool(request.user and request.user.is_authenticated and role.lower() == "tl")

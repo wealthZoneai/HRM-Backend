@@ -1,7 +1,5 @@
 # hr/views.py
-from hr.serializers import TLAnnouncementSerializer
 from tl.models import TLAnnouncement
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import generics, status, permissions
@@ -10,17 +8,16 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance, Notification
-from . import serializers
+from . import serializers 
 from .permissions import IsHR, IsTL
 from django.db.models import Sum, Count
 from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
 from . import models
-from .serializers import AnnouncementSerializer
+from .serializers import AnnouncementSerializer, TLAnnouncementSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Announcement
-from tl.serializers import TLAnnouncementSerializer
+from .models import Announcement 
 
 
 User = get_user_model()
@@ -56,8 +53,13 @@ class HRAttendanceListAPIView(generics.ListAPIView):
         if user_id:
             qs = qs.filter(user__id=user_id)
         if month:
-            y, m = map(int, month.split('-'))
-            qs = qs.filter(date__year=y, date__month=m)
+            try:
+                y, m = map(int, month.split('-'))
+                qs = qs.filter(date__year=y, date__month=m)
+            except (ValueError, AttributeError):
+                # ignore bad format and return unfiltered by month
+                pass
+
         return qs.order_by('-date')
 
 
@@ -107,22 +109,25 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsHR])
 def create_announcement(request):
     serializer = AnnouncementSerializer(data=request.data)
     if serializer.is_valid():
         announcement = serializer.save(created_by=request.user)
 
-        employees = User.objects.filter(role__icontains="emp")
+        employees = User.objects.filter(role__iexact="employee")
+        employees = User.objects.filter(employeeprofile__isnull=False)
 
+        notifs = []
         for emp in employees:
-            Notification.objects.create(
+            notifs.append(Notification(
                 to_user=emp,
                 title=f"New Announcement: {announcement.title}",
                 body=f"HR added a new announcement: {announcement.title}",
                 notif_type="announcement",
                 extra={"announcement_id": announcement.id}
-            )
+            ))
+        Notification.objects.bulk_create(notifs)
 
         return Response({
             "success": True,
@@ -131,7 +136,7 @@ def create_announcement(request):
         })
 
 
-@csrf_exempt
+
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -146,7 +151,7 @@ def list_announcements(request):
 
 @api_view(['PUT', 'PATCH'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsHR])
 def update_announcement(request, pk):
     try:
         announce = Announcement.objects.get(pk=pk)
@@ -158,7 +163,9 @@ def update_announcement(request, pk):
     if serializer.is_valid():
         announcement = serializer.save()
 
-        employees = User.objects.filter(role__icontains="emp")
+        employees = User.objects.filter(role__iexact="employee")
+        employees = User.objects.filter(employeeprofile__isnull=False)
+
 
         for emp in employees:
             Notification.objects.create(
@@ -174,7 +181,7 @@ def update_announcement(request, pk):
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsHR])
 def delete_announcement(request, pk):
     try:
         announce = Announcement.objects.get(pk=pk)
@@ -184,7 +191,9 @@ def delete_announcement(request, pk):
     title = announce.title
     announce.delete()
 
-    employees = User.objects.filter(role__icontains="emp")
+    employees = User.objects.filter(role__iexact="employee")
+    employees = User.objects.filter(employeeprofile__isnull=False)
+
 
     for emp in employees:
         Notification.objects.create(
@@ -200,16 +209,17 @@ def delete_announcement(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def emp_tl_announcements(request):
-    profile = EmployeeProfile.objects.get(user=request.user)
+    profile = EmployeeProfile.objects.filter(
+        user=request.user).select_related('team_lead').first()
+    if not profile:
+        return Response({"message": "No profile found for user"}, status=404)
 
     tl = profile.team_lead
-
-    if tl is None:
+    if not tl:
         return Response({"message": "No Team Lead assigned"}, status=200)
 
     announcements = TLAnnouncement.objects.filter(created_by=tl)
     serializer = TLAnnouncementSerializer(announcements, many=True)
-
     return Response(serializer.data)
 
 

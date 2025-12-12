@@ -15,6 +15,9 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
 
 class TLAnnouncementSerializer(serializers.ModelSerializer):
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = TLAnnouncement
         fields = "__all__"
+        read_only_fields = ("created_by", "created_role", "id")

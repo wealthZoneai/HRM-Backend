@@ -1,5 +1,4 @@
 # tl/views.py
-from hr.serializers import AnnouncementSerializer as TLAnnouncementSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics, status
@@ -9,12 +8,12 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from emp.models import EmployeeProfile, LeaveRequest, Attendance, CalendarEvent
+from emp.permissions import IsHROrManagement
 from emp.serializers import LeaveRequestSerializer, AttendanceReadSerializer, CalendarEventSerializer
-from .serializers import TeamMemberSerializer
+from .serializers import TeamMemberSerializer, TLAnnouncementSerializer
 from .permissions import IsTL
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from hr.serializers import TLAnnouncementSerializer
 
 User = get_user_model()
 
@@ -68,13 +67,17 @@ class TLTeamAttendanceAPIView(generics.ListAPIView):
         month = self.request.query_params.get("month")
         team = EmployeeProfile.objects.filter(
             team_lead=self.request.user).values_list("user", flat=True)
-
         qs = Attendance.objects.filter(user__in=team)
 
-        if month:
-            y, m = map(int, month.split("-"))
-            qs = qs.filter(date__year=y, date__month=m)
+        if not month:
+            return qs.order_by("-date")
 
+        try:
+            y, m = map(int, month.split("-"))
+        except (ValueError, AttributeError):
+            return qs.order_by("-date")
+
+        qs = qs.filter(date__year=y, date__month=m)
         return qs.order_by("-date")
 
 
@@ -88,16 +91,22 @@ class TLCreateEventAPIView(APIView):
         start_time = request.data.get("start_time")
         end_time = request.data.get("end_time")
 
-        event = CalendarEvent.objects.create(
-            title=title,
-            description=description,
-            event_type="meeting",
-            date=date,
-            start_time=start_time,
-            end_time=end_time,
-            created_by=request.user,
-            visible_to_tl_hr=True,
-        )
+        if not title or not date or not start_time or not end_time:
+            return Response({"detail": "Missing required fields."}, status=400)
+
+        try:
+            event = CalendarEvent.objects.create(
+                title=title,
+                description=description,
+                event_type="meeting",
+                date=date,
+                start_time=start_time,
+                end_time=end_time,
+                created_by=request.user,
+                visible_to_tl_hr=True,
+            )
+        except Exception as e:
+            return Response({"detail": "Invalid event data", "error": str(e)}, status=400)
 
         return Response(CalendarEventSerializer(event).data, status=201)
 
@@ -134,7 +143,6 @@ class TLDashboardAPIView(APIView):
             created_by=user
         ).order_by("-date")[:5]
 
-        from emp.serializers import CalendarEventSerializer
         meeting_data = CalendarEventSerializer(meetings, many=True).data
 
         return Response({
@@ -142,6 +150,7 @@ class TLDashboardAPIView(APIView):
             "pending_leave_requests": pending_leaves,
             "attendance_summary": {
                 "present_days": total_present,
+                # duration_time stored in seconds → convert to hours
                 "total_hours": round(total_hours / 3600, 2)
             },
             "recent_meetings": meeting_data
@@ -149,13 +158,15 @@ class TLDashboardAPIView(APIView):
 
 
 class TeamLeadListAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsHROrManagement]
 
     def get(self, request):
 
         dept = request.query_params.get('department')
 
-        qs = User.objects.filter(role='tl', employeeprofile__isnull=False)
+        qs = User.objects.filter(
+            role__iexact='tl', employeeprofile__isnull=False)
+        
         if dept:
             qs = qs.filter(employeeprofile__department__iexact=dept)
 
@@ -166,17 +177,18 @@ class TeamLeadListAPIView(APIView):
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsTL])
 def tl_create_announcement(request):
     """
     TL creates announcement for their employees
     """
-    serializer = TLAnnouncementSerializer(data=request.data)
+    data = request.data.copy()
+    data['created_by'] = request.user.id
+    data.setdefault('created_role', 'TL')
+
+    serializer = TLAnnouncementSerializer(data=data)
     if serializer.is_valid():
-        serializer.save(
-            created_by=request.user,
-            created_role='TL'
-        )
+        serializer.save(created_by=request.user)
         return Response({
             "success": True,
             "message": "Announcement created successfully",
@@ -187,16 +199,3 @@ def tl_create_announcement(request):
         "success": False,
         "errors": serializer.errors
     }, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def tl_create_announcement(request):
-    data = request.data.copy()
-    data['created_by'] = request.user.id
-
-    serializer = TLAnnouncementSerializer(data=data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({"success": True, "message": "Announcement created"})
-    return Response({"success": False, "errors": serializer.errors})

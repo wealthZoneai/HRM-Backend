@@ -64,17 +64,11 @@ urlpatterns = [
     path('action/leave/<int:leave_id>/',
          views.HRTLActionAPIView.as_view(), name='tl-hr-leave-action'),
 
-    path('timesheet/daily/form/', views.TimesheetDailyUpdateAPIView.as_view(),
-         name='timesheet_daily_form'),
-
     path('timesheet/daily/update/', views.TimesheetDailyUpdateAPIView.as_view(),
          name='timesheet_daily_update'),
 
     path('timesheet/daily/form/', views.TimesheetDailyFormAPIView.as_view(),
          name='timesheet_daily_form'),
-
-    path('timesheet/daily/update/', views.TimesheetDailyUpdateAPIView.as_view(),
-         name='timesheet_daily_update'),
 
     path('timesheet/hr/daily/',
          views.TimesheetDailyForHRAPIView.as_view(),   name='timesheet_hr_daily'),

@@ -31,3 +31,9 @@ class PasswordResetOTP(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - OTP {self.otp}"
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["is_used", "created_at"]),
+        ]

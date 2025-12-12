@@ -32,6 +32,42 @@ from hr.serializers import AnnouncementSerializer
 User = get_user_model()
 
 
+def _employee_display_name(prof):
+    """Best-effort employee display name (safe fallbacks)."""
+    try:
+        fn = getattr(prof, "full_name", None)
+        if callable(fn):
+            name = fn()
+            if name:
+                return name
+    except Exception:
+        pass
+
+    first = getattr(prof, "first_name", "") or ""
+    last = getattr(prof, "last_name", "") or ""
+    combined = " ".join(p for p in (first.strip(), last.strip()) if p).strip()
+    if combined:
+        return combined
+
+    user = getattr(prof, "user", None)
+    if user:
+        try:
+            guf = getattr(user, "get_full_name", None)
+            if callable(guf):
+                u_name = guf()
+                if u_name:
+                    return u_name
+        except Exception:
+            pass
+
+        if getattr(user, "username", None):
+            return user.username
+        if getattr(user, "email", None):
+            return user.email
+
+    return getattr(prof, "emp_id", "")
+
+
 class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -696,38 +732,6 @@ class TimesheetDailyUpdateAPIView(APIView):
         }, status=201)
 
 
-def _employee_display_name(prof):
-    """Best-effort employee display name (safe fallbacks)."""
-    try:
-        fn = getattr(prof, "full_name", None)
-        if callable(fn):
-            name = fn()
-            if name:
-                return name
-    except Exception:
-        pass
-    first = getattr(prof, "first_name", "") or ""
-    last = getattr(prof, "last_name", "") or ""
-    combined = " ".join(p for p in (first.strip(), last.strip()) if p).strip()
-    if combined:
-        return combined
-    user = getattr(prof, "user", None)
-    if user:
-        try:
-            guf = getattr(user, "get_full_name", None)
-            if callable(guf):
-                u_name = guf()
-                if u_name:
-                    return u_name
-        except Exception:
-            pass
-        if getattr(user, "username", None):
-            return user.username
-        if getattr(user, "email", None):
-            return user.email
-    return getattr(prof, "emp_id", "")
-
-
 class TimesheetDailyForHRAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -974,37 +978,6 @@ class TimesheetYearlyForHRAPIView(APIView):
             "year_total_hours": round(year_total_seconds / 3600.0, 2),
             "months": months
         }, status=status.HTTP_200_OK)
-
-
-def _employee_display_name(prof):
-    try:
-        fn = getattr(prof, "full_name", None)
-        if callable(fn):
-            name = fn()
-            if name:
-                return name
-    except Exception:
-        pass
-    first = getattr(prof, "first_name", "") or ""
-    last = getattr(prof, "last_name", "") or ""
-    combined = " ".join(p for p in (first.strip(), last.strip()) if p).strip()
-    if combined:
-        return combined
-    user = getattr(prof, "user", None)
-    if user:
-        try:
-            guf = getattr(user, "get_full_name", None)
-            if callable(guf):
-                u_name = guf()
-                if u_name:
-                    return u_name
-        except Exception:
-            pass
-        if getattr(user, "username", None):
-            return user.username
-        if getattr(user, "email", None):
-            return user.email
-    return getattr(prof, "emp_id", "")
 
 
 class TimesheetDailyForTLAPIView(APIView):

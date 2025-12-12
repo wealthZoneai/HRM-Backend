@@ -34,9 +34,9 @@ def protected_employee_media(request, pk, field_name):
 
     user = request.user
 
-    is_hr = getattr(user, "role", None) in (
-        "HR", "hr", "HR_MANAGER", "Management", "management")
-
+    role = (getattr(user, "role", "") or "").lower()
+    is_hr = role in ("hr", "management")
+    
     is_owner = False
     try:
         if profile.user == user:

@@ -1,26 +1,38 @@
+# login/permissions.py 
+
 from rest_framework.permissions import BasePermission
 
 
-class IsManagement(BasePermission):
+class RolePermission(BasePermission):
+    """
+    Generic role permission: subclass and set `required_role` attribute.
+    """
+
+    required_role = None
+
     def has_permission(self, request, view):
-        return request.user.role == "management"
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        role = getattr(user, "role", "") or ""
+        return role.lower() == (self.required_role or "").lower()
 
 
-class IsHR(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == "hr"
+class IsManagement(RolePermission):
+    required_role = "management"
 
 
-class IsTL(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == "tl"
+class IsHR(RolePermission):
+    required_role = "hr"
 
 
-class IsEmployee(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == "employee"
+class IsTL(RolePermission):
+    required_role = "tl"
 
 
-class IsIntern(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == "intern"
+class IsEmployee(RolePermission):
+    required_role = "employee"
+
+
+class IsIntern(RolePermission):
+    required_role = "intern"

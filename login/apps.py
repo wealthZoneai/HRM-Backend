@@ -7,4 +7,7 @@ class LoginConfig(AppConfig):
     name = 'login'
 
     def ready(self):
-        pass
+        try:
+            import login.signals 
+        except Exception:
+            pass
