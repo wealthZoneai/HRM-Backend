@@ -2,8 +2,6 @@
 from .models import TimesheetEntry, TimesheetDay, Attendance
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from login import models
-from emp.models import LeaveRequest
 from .models import (
     EmployeeProfile, Notification, Shift, Attendance, CalendarEvent,
     SalaryStructure, EmployeeSalary, Payslip,
@@ -525,14 +523,14 @@ class LeaveApplySerializer(serializers.Serializer):
             )
 
         leave_type_name = data.get('leave_type', '').strip()
-        lt = models.LeaveType.objects.filter(
+        lt = LeaveType.objects.filter(
             name__iexact=leave_type_name).first()
         if not lt:
             raise serializers.ValidationError(
                 {"leave_type": f"Leave type '{leave_type_name}' not found."}
             )
 
-        lb = models.LeaveBalance.objects.filter(
+        lb = LeaveBalance.objects.filter(
             profile=profile, leave_type=lt).first()
         if lb:
 
