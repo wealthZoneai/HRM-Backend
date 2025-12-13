@@ -306,7 +306,7 @@ class HRLeaveListAPIView(generics.ListAPIView):
     serializer_class = serializers.LeaveRequestAdminSerializer
 
     def get_queryset(self):
-        q = LeaveRequest.objects.all().select_related('profile', 'leave_type')
+        q = LeaveRequest.objects.all().select_related('profile')
         status = self.request.query_params.get('status')
         if status:
             q = q.filter(status=status)

@@ -35,7 +35,7 @@ class TLPendingLeaveAPIView(generics.ListAPIView):
         return LeaveRequest.objects.filter(
             tl=self.request.user,
             status="applied"
-        ).select_related("profile", "leave_type")
+        ).select_related("profile")
 
 
 class TLApproveRejectLeaveAPIView(APIView):
