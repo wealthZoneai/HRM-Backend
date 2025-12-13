@@ -109,23 +109,6 @@
           }
         },
         {
-          "name": "Verify OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/api/verify-otp/",
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"email\": \"\", \"otp\": \"\" }"
-            }
-          }
-        },
-        {
           "name": "Reset Password",
           "request": {
             "method": "POST",
