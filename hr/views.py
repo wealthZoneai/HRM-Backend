@@ -49,7 +49,7 @@ class HRAttendanceListAPIView(generics.ListAPIView):
     def get_queryset(self):
         user_id = self.request.query_params.get('user_id')
         month = self.request.query_params.get('month')
-        qs = Attendance.objects.all().select_related('user', 'shift')
+        qs = Attendance.objects.all().select_related('user')
         if user_id:
             qs = qs.filter(user__id=user_id)
         if month:
