@@ -3,6 +3,7 @@ from .models import TimesheetEntry, TimesheetDay, Attendance
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from login import models
+from emp.models import LeaveRequest
 from .models import (
     EmployeeProfile, Notification, Shift, Attendance, CalendarEvent,
     SalaryStructure, EmployeeSalary, Payslip,
@@ -511,9 +512,9 @@ class LeaveApplySerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Employee profile not found for current user.")
 
-        overlapping = models.LeaveRequest.objects.filter(
+        overlapping = LeaveRequest.objects.filter(
             profile=profile
-        ).exclude(status__in=['tl_rejected', 'hr_rejected', 'rejected']).filter(
+        ).exclude(status__in=['tl_rejected', 'hr_rejected']).filter(
             start_date__lte=end,
             end_date__gte=start
         ).exists()
