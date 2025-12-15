@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance, Notification
-from . import serializers 
+from . import serializers
 from .permissions import IsHR, IsTL
 from django.db.models import Sum, Count
 from django.utils import timezone
@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model
 from . import models
 from .serializers import AnnouncementSerializer, TLAnnouncementSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Announcement 
+from .models import Announcement
 
 
 User = get_user_model()
@@ -109,7 +109,7 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated, IsHR])
+@permission_classes([IsAuthenticated, IsHR, IsTL])
 def create_announcement(request):
     serializer = AnnouncementSerializer(data=request.data)
     if serializer.is_valid():
@@ -133,8 +133,16 @@ def create_announcement(request):
             "success": True,
             "message": "Announcement created successfully",
             "data": serializer.data
-        })
-
+        },
+            status=201
+        )
+    return Response(
+        {
+            "success": False,
+            "errors": serializer.errors,
+        },
+        status=400
+    )
 
 
 @api_view(['GET'])
@@ -166,7 +174,6 @@ def update_announcement(request, pk):
         employees = User.objects.filter(role__iexact="employee")
         employees = User.objects.filter(employeeprofile__isnull=False)
 
-
         for emp in employees:
             Notification.objects.create(
                 to_user=emp,
@@ -193,7 +200,6 @@ def delete_announcement(request, pk):
 
     employees = User.objects.filter(role__iexact="employee")
     employees = User.objects.filter(employeeprofile__isnull=False)
-
 
     for emp in employees:
         Notification.objects.create(
@@ -331,17 +337,18 @@ class HRLeaveActionAPIView(APIView):
 
             try:
                 lb = LeaveBalance.objects.get(
-                    profile=lr.profile, leave_type=lr.leave_type)
+                    profile=lr.profile,
+                    leave_type__name__iexact=lr.leave_type)
                 lb.used = lb.used + lr.days
                 lb.save()
             except LeaveBalance.DoesNotExist:
                 pass
 
-            models.Notification.objects.create(to_user=lr.profile.user, title='Leave approved',
-                                               body=remarks or 'Your leave approved by HR', notif_type='leave', extra={'leave_id': lr.id})
+            Notification.objects.create(to_user=lr.profile.user, title='Leave approved',
+                                        body=remarks or 'Your leave approved by HR', notif_type='leave', extra={'leave_id': lr.id})
             return Response({'detail': 'approved'})
         else:
             lr.apply_hr_approval(request.user, approve=False, remarks=remarks)
-            models.Notification.objects.create(to_user=lr.profile.user, title='Leave rejected',
-                                               body=remarks or 'Your leave rejected by HR', notif_type='leave', extra={'leave_id': lr.id})
+            Notification.objects.create(to_user=lr.profile.user, title='Leave rejected',
+                                        body=remarks or 'Your leave rejected by HR', notif_type='leave', extra={'leave_id': lr.id})
             return Response({'detail': 'rejected'})
