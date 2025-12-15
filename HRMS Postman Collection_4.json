@@ -509,7 +509,7 @@
                 "value": "Bearer {{access_token}}"
               }
             ],
-            "url": "{{base_url}}/api/announcement/create/",
+            "url": "{{base_url}}/api/tl/announcement/create/",
             "body": {
               "mode": "raw",
               "raw": "{ \"title\": \"\", \"description\": \"\", \"date\": \"2025-01-10\", \"time\": \"10:00\", \"priority\": \"HIGH\" }"

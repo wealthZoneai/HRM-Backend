@@ -23,6 +23,6 @@ urlpatterns = [
     path("calendar/create/", views.TLCreateEventAPIView.as_view(),
          name="calendar-create"),
 
-    path("announcement/create/", views.tl_create_announcement,
+    path("tl/announcement/create/", views.tl_create_announcement,
          name="tl-create-announcement"),
 ]

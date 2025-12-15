@@ -109,7 +109,7 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated, IsHR, IsTL])
+@permission_classes([IsAuthenticated, IsHR])
 def create_announcement(request):
     serializer = AnnouncementSerializer(data=request.data)
     if serializer.is_valid():
