@@ -27,6 +27,8 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from hr.models import Announcement
 from hr.serializers import AnnouncementSerializer
+from datetime import datetime
+from django.utils import timezone
 
 
 User = get_user_model()
@@ -703,14 +705,29 @@ class TimesheetDailyUpdateAPIView(APIView):
         TimesheetEntry.objects.filter(profile=prof, date=today).delete()
         saved_objs = []
         for item in entries_data:
+
+            if isinstance(item["start_time"], datetime):
+                start_dt = item["start_time"]
+            else:
+                start_dt = timezone.make_aware(
+                    datetime.combine(today, item["start_time"])
+                )
+
+            if isinstance(item["end_time"], datetime):
+                end_dt = item["end_time"]
+            else:
+                end_dt = timezone.make_aware(
+                    datetime.combine(today, item["end_time"])
+                )   
+
             obj = TimesheetEntry.objects.create(
                 profile=prof,
                 date=today,
                 day=today.strftime("%A"),
                 task=item["task"],
                 description=item.get("description", ""),
-                start_time=item["start_time"],
-                end_time=item["end_time"],
+                start_time=start_dt,
+                end_time=end_dt,
             )
             saved_objs.append(obj)
 
