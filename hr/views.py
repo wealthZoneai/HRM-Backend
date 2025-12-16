@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance, Notification
 from . import serializers
 from .permissions import IsHR, IsTL
@@ -106,6 +107,20 @@ class HRCalendarCreateAPIView(generics.CreateAPIView):
     serializer_class = serializers.CalendarEventSerializer
     queryset = CalendarEvent.objects.all()
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class HRCalendarUpdateAPIView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsHR]
+    serializer_class = serializers.CalendarEventSerializer
+    queryset = CalendarEvent.objects.all()
+
+
+class HRCalendarDeleteAPIView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated, IsHR]
+    queryset = CalendarEvent.objects.all()
+
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -115,34 +130,18 @@ def create_announcement(request):
     if serializer.is_valid():
         announcement = serializer.save(created_by=request.user)
 
-        employees = User.objects.filter(role__iexact="employee")
-        employees = User.objects.filter(employeeprofile__isnull=False)
-
-        notifs = []
-        for emp in employees:
-            notifs.append(Notification(
-                to_user=emp,
-                title=f"New Announcement: {announcement.title}",
-                body=f"HR added a new announcement: {announcement.title}",
-                notif_type="announcement",
-                extra={"announcement_id": announcement.id}
-            ))
-        Notification.objects.bulk_create(notifs)
-
-        return Response({
-            "success": True,
-            "message": "Announcement created successfully",
-            "data": serializer.data
-        },
-            status=201
-        )
-    return Response(
-        {
-            "success": False,
-            "errors": serializer.errors,
-        },
-        status=400
-    )
+        if announcement.show_in_calendar:
+            CalendarEvent.objects.create(
+                title=announcement.title,
+                description=announcement.description,
+                event_type="announcement",
+                date=announcement.date,
+                start_time=announcement.time,
+                created_by=request.user,
+                extra={"announcement_id": announcement.id, "source": "HR"}
+            )
+        return Response({"success": True, "message": "created"})
+    return Response(serializer.errors, status=400)
 
 
 @api_view(['GET'])
@@ -227,6 +226,49 @@ def emp_tl_announcements(request):
     announcements = TLAnnouncement.objects.filter(created_by=tl)
     serializer = TLAnnouncementSerializer(announcements, many=True)
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsHR])
+def create_announcement(request):
+    serializer = AnnouncementSerializer(data=request.data)
+    if serializer.is_valid():
+        announcement = serializer.save(created_by=request.user)
+
+        if announcement.show_in_calendar:
+            CalendarEvent.objects.create(
+                title=announcement.title,
+                description=announcement.description,
+                event_type="announcement",
+                date=announcement.date,
+                start_time=announcement.time,
+                created_by=request.user,
+                extra={
+                    "announcement_id": announcement.id,
+                    "source": "HR"
+                }
+            )
+
+        employees = User.objects.filter(employeeprofile__isnull=False)
+        Notification.objects.bulk_create([
+            Notification(
+                to_user=emp,
+                title=f"New Announcement: {announcement.title}",
+                body=announcement.description,
+                notif_type="announcement",
+                extra={"announcement_id": announcement.id}
+            )
+            for emp in employees
+        ])
+
+        return Response({
+            "success": True,
+            "message": "Announcement created",
+            "data": serializer.data
+        }, status=201)
+
+    return Response(serializer.errors, status=400)
 
 
 class SalaryStructureListCreateAPIView(generics.ListCreateAPIView):
@@ -331,24 +373,63 @@ class HRLeaveActionAPIView(APIView):
     def post(self, request, leave_id):
         action = request.data.get('action')
         remarks = request.data.get('remarks', '')
+
         lr = get_object_or_404(LeaveRequest, id=leave_id)
-        if action == 'approve':
-            lr.apply_hr_approval(request.user, approve=True, remarks=remarks)
 
-            try:
-                lb = LeaveBalance.objects.get(
-                    profile=lr.profile,
-                    leave_type__name__iexact=lr.leave_type)
-                lb.used = lb.used + lr.days
-                lb.save()
-            except LeaveBalance.DoesNotExist:
-                pass
+        try:
+            if action == 'approve':
+                lr.apply_hr_approval(
+                    request.user,
+                    approve=True,
+                    remarks=remarks
+                )
 
-            Notification.objects.create(to_user=lr.profile.user, title='Leave approved',
-                                        body=remarks or 'Your leave approved by HR', notif_type='leave', extra={'leave_id': lr.id})
-            return Response({'detail': 'approved'})
-        else:
-            lr.apply_hr_approval(request.user, approve=False, remarks=remarks)
-            Notification.objects.create(to_user=lr.profile.user, title='Leave rejected',
-                                        body=remarks or 'Your leave rejected by HR', notif_type='leave', extra={'leave_id': lr.id})
-            return Response({'detail': 'rejected'})
+                try:
+                    lb = LeaveBalance.objects.get(
+                        profile=lr.profile,
+                        leave_type__name__iexact=lr.leave_type
+                    )
+                    lb.used += lr.days
+                    lb.save()
+                except LeaveBalance.DoesNotExist:
+                    pass
+
+                Notification.objects.create(
+                    to_user=lr.profile.user,
+                    title='Leave approved',
+                    body=remarks or 'Your leave approved by HR',
+                    notif_type='leave',
+                    extra={'leave_id': lr.id}
+                )
+
+                return Response(
+                    {'detail': 'Leave approved by HR'},
+                    status=status.HTTP_200_OK
+                )
+
+            else:
+                lr.apply_hr_approval(
+                    request.user,
+                    approve=False,
+                    remarks=remarks
+                )
+
+                Notification.objects.create(
+                    to_user=lr.profile.user,
+                    title='Leave rejected',
+                    body=remarks or 'Your leave rejected by HR',
+                    notif_type='leave',
+                    extra={'leave_id': lr.id}
+                )
+
+                return Response(
+                    {'detail': 'Leave rejected by HR'},
+                    status=status.HTTP_200_OK
+                )
+
+        except ValidationError as e:
+            return Response(
+                e.message_dict if hasattr(e, "message_dict") else {
+                    "detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

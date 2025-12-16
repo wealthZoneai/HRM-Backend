@@ -389,17 +389,97 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
 
 
 class EmployeeContactUpdateSerializer(serializers.ModelSerializer):
+    """
+    Employee can update ONLY EMPTY contact fields.
+    HR / Management can update anytime.
+    """
+
     class Meta:
         model = EmployeeProfile
-        fields = ('personal_email', 'phone_number', 'alternate_number',
-                  'dob', 'blood_group', 'gender', 'marital_status', 'profile_photo')
+        fields = (
+            'personal_email',
+            'phone_number',
+            'alternate_number',
+            'dob',
+            'blood_group',
+            'gender',
+            'marital_status',
+            'profile_photo',
+        )
+
+    def validate(self, data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user:
+            return data
+
+        role = (getattr(user, "role", "") or "").lower()
+        is_hr = role in ("hr", "management")
+
+        # HR can update freely
+        if is_hr:
+            return data
+
+        # Employee: allow ONLY empty fields
+        instance = self.instance
+        errors = {}
+
+        for field, value in data.items():
+            existing_value = getattr(instance, field, None)
+
+            if existing_value not in (None, "", []):
+                errors[field] = "This field can only be modified by HR."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
 
 
 class EmployeeIdentificationSerializer(serializers.ModelSerializer):
+    """
+    Employee can upload identification ONLY if EMPTY.
+    HR / Management can update anytime.
+    """
+
     class Meta:
         model = EmployeeProfile
-        fields = ('aadhaar_number', 'pan', 'passport_number',
-                  'aadhaar_image', 'pan_image', 'passport_image')
+        fields = (
+            'aadhaar_number',
+            'pan',
+            'passport_number',
+            'aadhaar_image',
+            'pan_image',
+            'passport_image',
+        )
+
+    def validate(self, data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user:
+            return data
+
+        role = (getattr(user, "role", "") or "").lower()
+        is_hr = role in ("hr", "management")
+
+        if is_hr:
+            return data
+
+        instance = self.instance
+        errors = {}
+
+        for field, value in data.items():
+            existing_value = getattr(instance, field, None)
+
+            if existing_value not in (None, "", []):
+                errors[field] = "This identification field can only be modified by HR."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -421,10 +501,28 @@ class AttendanceReadSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class TodayAttendanceSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = [
+            "user_id",
+            "user_name",
+            "date",
+            "clock_in",
+            "clock_out",
+            "duration_time",
+            "status",
+        ]
+
+
 class CalendarEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = CalendarEvent
         fields = '__all__'
+        read_only_fields = ['created_by', 'created_at']
 
 
 class SalaryStructureSerializer(serializers.ModelSerializer):
@@ -684,3 +782,50 @@ class DailyTimesheetUpdateSerializer(serializers.Serializer):
                 )
 
         return data
+
+
+class EmployeeSensitiveSelfSerializer(serializers.ModelSerializer):
+    """
+    Full sensitive data for the OWNER only.
+    This serializer MUST NOT be used in list or profile APIs.
+    """
+
+    class Meta:
+        model = EmployeeProfile
+        fields = (
+            "aadhaar_number",
+            "pan",
+            "passport_number",
+            "bank_name",
+            "ifsc_code",
+            "account_number",
+            "branch",
+        )
+
+
+class EmployeeSensitiveHRSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeProfile
+        fields = (
+            "user",
+            "emp_id",
+            "first_name",
+            "last_name",
+            "aadhaar_number",
+            "pan",
+            "passport_number",
+            "bank_name",
+            "ifsc_code",
+            "account_number",
+            "branch",
+        )
+
+    def get_user(self, obj):
+        return {
+            "id": obj.user.id,
+            "username": obj.user.username,
+            "email": obj.user.email,
+            "role": obj.user.role,
+        }

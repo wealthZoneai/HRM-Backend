@@ -144,6 +144,19 @@
           }
         },
         {
+          "name": "My Profile Sensitive Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/my-profile/sensitive/"
+          }
+        },
+        {
           "name": "Update Contact",
           "request": {
             "method": "PATCH",
@@ -295,6 +308,19 @@
               }
             ],
             "url": "{{base_url}}/api/notifications/"
+          }
+        },
+        {
+          "name": "Announcements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/announcements/"
           }
         },
         {
@@ -515,6 +541,40 @@
               "raw": "{ \"title\": \"\", \"description\": \"\", \"date\": \"2025-01-10\", \"time\": \"10:00\", \"priority\": \"HIGH\" }"
             }
           }
+        },
+        {
+          "name": "TL List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tl/list/"
+          }
+        },
+        {
+          "name": "Daily Timesheet",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tl/list/"
+          }
         }
       ]
     },
@@ -583,6 +643,19 @@
               }
             ],
             "url": "{{base_url}}/api/employees/{{employee_profile_id}}/"
+          }
+        },
+        {
+          "name": "Employee Detail Sensitive",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/hr/employee/<str:emp_id>/sensitive//"
           }
         },
         {

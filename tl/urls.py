@@ -20,9 +20,21 @@ urlpatterns = [
     path("leave/<int:leave_id>/action/",
          views.TLApproveRejectLeaveAPIView.as_view(), name="leave-action"),
 
-    path("calendar/create/", views.TLCreateEventAPIView.as_view(),
+    path("tl/calendar/create/", views.TLCreateEventAPIView.as_view(),
          name="calendar-create"),
+
+    path('tl/calendar/<int:pk/update/',
+         views.TLCalendarUpdateAPIView.as_view(), name='tl_calendar_update'),
+
+    path('tl/calendar/<int:pk/delete/',
+         views.TLCalendarDeleteAPIView.as_view(), name='tl_calendar_delete'),
 
     path("tl/announcement/create/", views.tl_create_announcement,
          name="tl-create-announcement"),
+
+    path("tl/announcement/<int:pk>/update/", views.tl_update_announcement,
+         name="tl-update-announcement"),
+
+    path("tl/announcement/<int:pk>/delete/", views.tl_delete_announcement,
+         name="tl-delete-announcement"),
 ]

@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Sum
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from emp.models import EmployeeProfile, LeaveRequest, Attendance, CalendarEvent
+from emp.models import EmployeeProfile, LeaveRequest, Attendance, CalendarEvent, Notification
+from .models import TLAnnouncement
 from emp.permissions import IsHROrManagement
 from emp.serializers import LeaveRequestSerializer, AttendanceReadSerializer, CalendarEventSerializer
 from .serializers import TeamMemberSerializer, TLAnnouncementSerializer
@@ -111,6 +112,21 @@ class TLCreateEventAPIView(APIView):
         return Response(CalendarEventSerializer(event).data, status=201)
 
 
+class TLCalendarUpdateAPIView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsTL]
+    serializer_class = CalendarEventSerializer
+
+    def get_queryset(self):
+        return CalendarEvent.objects.filter(created_by=self.request.user)
+
+
+class TLCalendarDeleteAPIView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated, IsTL]
+
+    def get_queryset(self):
+        return CalendarEvent.objects.filter(created_by=self.request.user)
+
+
 class TLDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
 
@@ -166,7 +182,7 @@ class TeamLeadListAPIView(APIView):
 
         qs = User.objects.filter(
             role__iexact='tl', employeeprofile__isnull=False)
-        
+
         if dept:
             qs = qs.filter(employeeprofile__department__iexact=dept)
 
@@ -179,23 +195,137 @@ class TeamLeadListAPIView(APIView):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsTL])
 def tl_create_announcement(request):
-    """
-    TL creates announcement for their employees
-    """
-    data = request.data.copy()
-    data['created_by'] = request.user.id
-    data.setdefault('created_role', 'TL')
-
-    serializer = TLAnnouncementSerializer(data=data)
+    serializer = TLAnnouncementSerializer(data=request.data)
+ 
     if serializer.is_valid():
-        serializer.save(created_by=request.user)
+        announcement = serializer.save(
+            created_by=request.user,
+            created_role='TL'
+        )
+ 
+        # ✅ CORRECT FILTER
+        employees = EmployeeProfile.objects.filter(
+            team_lead=request.user,
+            is_active=True
+        ).select_related('user')
+ 
+        print("Employees found:", employees.count())
+ 
+        Notification.objects.bulk_create([
+            Notification(
+                to_user=emp.user,
+                title=announcement.title,
+                body=announcement.description,
+                notif_type='announcement'
+            )
+            for emp in employees
+        ])
+ 
         return Response({
             "success": True,
-            "message": "Announcement created successfully",
+            "message": "Announcement sent to team"
+        })
+ 
+    return Response(serializer.errors, status=400)
+ 
+@api_view(['PUT'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsTL])
+def tl_update_announcement(request, pk):
+    try:
+        announcement = TLAnnouncement.objects.get(
+            pk=pk,
+            created_by=request.user   # TL can update only own announcements
+        )
+    except TLAnnouncement.DoesNotExist:
+        return Response(
+            {"success": False, "message": "Announcement not found"},
+            status=404
+        )
+ 
+    serializer = TLAnnouncementSerializer(
+        announcement, data=request.data, partial=True
+    )
+ 
+    if serializer.is_valid():
+        serializer.save()
+ 
+        return Response({
+            "success": True,
+            "message": "Announcement updated successfully",
             "data": serializer.data
-        }, status=status.HTTP_201_CREATED)
-
+        })
+ 
+    return Response(serializer.errors, status=400)
+ 
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsTL])
+def tl_delete_announcement(request, pk):
+    try:
+        announcement = TLAnnouncement.objects.get(
+            pk=pk,
+            created_by=request.user
+        )
+    except TLAnnouncement.DoesNotExist:
+        return Response(
+            {"success": False, "message": "Announcement not found"},
+            status=404
+        )
+ 
+    announcement.delete()
+ 
     return Response({
-        "success": False,
-        "errors": serializer.errors
-    }, status=status.HTTP_400_BAD_REQUEST)
+        "success": True,
+        "message": "Announcement deleted successfully"
+    })
+ 
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsTL])
+def tl_create_announcement(request):
+    serializer = TLAnnouncementSerializer(data=request.data)
+ 
+    if serializer.is_valid():
+        announcement = serializer.save(
+            created_by=request.user,
+            created_role='TL'
+        )
+ 
+        if announcement.show_in_calendar:
+            CalendarEvent.objects.create(
+                title=announcement.title,
+                description=announcement.description,
+                event_type="announcement",
+                date=announcement.date,
+                start_time=announcement.time,
+                created_by=request.user,
+                visible_to_tl_hr=True,
+                extra={
+                    "tl_announcement_id": announcement.id,
+                    "source": "TL"
+                }
+            )
+
+
+        employees = EmployeeProfile.objects.filter(
+            team_lead=request.user,
+            is_active=True
+        ).select_related('user')
+ 
+        Notification.objects.bulk_create([
+            Notification(
+                to_user=emp.user,
+                title=announcement.title,
+                body=announcement.description,
+                notif_type="announcement"
+            )
+            for emp in employees
+        ])
+ 
+        return Response({
+            "success": True,
+            "message": "TL announcement created"
+        }, status=201)
+ 
+    return Response(serializer.errors, status=400)

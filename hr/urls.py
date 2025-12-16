@@ -32,10 +32,16 @@ urlpatterns = [
     path('calendar/create/', views.HRCalendarCreateAPIView.as_view(),
          name='hr-calendar-create'),
 
+    path('calendar/<int:pk>/update/',
+         views.HRCalendarUpdateAPIView.as_view(), name='calendar_update'),
+
+    path('calendar/<int:pk>/delete/',
+         views.HRCalendarDeleteAPIView.as_view(), name='calendar_update'),
+
     path("announcement/create/", views.create_announcement,
          name="api_create_announcement"),
 
-    path('announcement/list/', views.list_announcements),
+    path('announcement/list/', views.list_announcements, name='anouncements_list'),
 
     path('announcement/<int:pk>/update/',
          views.update_announcement, name='update-announcement'),

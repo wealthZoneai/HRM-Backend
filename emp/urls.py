@@ -21,7 +21,10 @@ urlpatterns = [
     path('attendance/days/', views.MyAttendanceDaysAPIView.as_view(),
          name='attendance-days'),
 
-    path('calendar/', views.CalendarEventsAPIView.as_view(), name='calendar'),
+    path('attendance/today/', views.TodayAttendanceView.as_view(),
+         name='today-attendance'),
+
+    path('calendar/events/', views.CalendarEventsAPIView.as_view(), name='calendar'),
 
     path("announcements/", views.emp_all_announcements,
          name="emp_all_announcements"),
@@ -60,6 +63,12 @@ urlpatterns = [
 
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
          name='hr-create-employee'),
+
+    path("my-profile/sensitive/", views.MySensitiveDetailsAPIView.as_view(),
+         name="my_sensitive_details"),
+
+    path("hr/employee/<str:emp_id>/sensitive/",
+         views.HREmployeeSensitiveDetailsAPIView.as_view(), name="hr_employee_sensitive_details"),
 
     path('action/leave/<int:leave_id>/',
          views.HRTLActionAPIView.as_view(), name='tl-hr-leave-action'),

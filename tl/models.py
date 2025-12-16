@@ -16,5 +16,7 @@ class TLAnnouncement(models.Model):
         related_name="tl_created_announcements"
     )
 
+    show_in_calendar = models.BooleanField(default=True)
+
     def __str__(self):
         return self.title

@@ -22,12 +22,13 @@ class Announcement(models.Model):
 
     title = models.CharField(max_length=200)
     description = models.TextField()
-    date = models.DateField(auto_now_add=True)
+    date = models.DateField()
     time = models.TimeField()
     department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    show_in_calendar = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title
@@ -42,13 +43,14 @@ class TLAnnouncement(models.Model):
 
     title = models.CharField(max_length=200)
     description = models.TextField()
-    date = models.DateField(default=timezone.now)
+    date = models.DateField()
     time = models.TimeField()
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tl_announcements'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    show_in_calendar = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title

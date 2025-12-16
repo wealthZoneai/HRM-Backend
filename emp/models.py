@@ -4,6 +4,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
+from datetime import timedelta
 
 User = settings.AUTH_USER_MODEL
 
@@ -206,6 +207,8 @@ class Attendance(models.Model):
         null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='working')
+    reminder_count = models.PositiveIntegerField(default=0)
+    last_reminder_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -239,6 +242,20 @@ class Attendance(models.Model):
             self.status = 'absent'
         else:
             self.status = 'working'
+
+    def worked_duration(self):
+        if not self.check_in:
+            return timedelta(0)
+
+        end_time = self.clock_out or timezone.now()
+        return end_time - self.check_in
+
+    def needs_clockout_reminder(self):
+        return (
+            self.check_in
+            and not self.clock_out
+            and self.worked_duration() >= timedelta(hours=9, minutes=0)
+        )
 
 
 class CalendarEvent(models.Model):
@@ -382,6 +399,10 @@ class LeaveRequest(models.Model):
         ordering = ['-applied_at']
 
     def apply_tl_approval(self, approver_user, approve: bool, remarks: str = None):
+        if self.status != 'applied':
+            raise ValidationError(
+                "TL action is allowed only when leave status is 'applied'."
+            )
         self.tl = approver_user
         self.tl_remarks = remarks or ''
         self.last_action_by = approver_user
@@ -393,6 +414,16 @@ class LeaveRequest(models.Model):
         self.save()
 
     def apply_hr_approval(self, approver_user, approve: bool, remarks: str = None):
+        if self.status == 'tl_rejected':
+            raise ValidationError(
+                {"detail": "HR cannot take action because TL has rejected this leave."}
+            )
+
+        if self.status not in ('tl_approved', 'pending_hr'):
+            raise ValidationError({"detail":
+                                   "HR action not allowed for current leave status."
+                                   })
+
         self.hr = approver_user
         self.hr_remarks = remarks or ''
         self.last_action_by = approver_user

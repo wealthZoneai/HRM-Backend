@@ -8,8 +8,10 @@ from .serializers import (
     EmployeeCreateSerializer,
     EmployeeProfileReadSerializer,
     NotificationSerializer,
+    TodayAttendanceSerializer,
 )
-from .models import TimesheetEntry, TimesheetDay, EmployeeProfile, Notification
+from .models import TimesheetEntry, TimesheetDay, EmployeeProfile, Notification, Attendance
+from tl.models import TLAnnouncement
 from django.db import transaction
 import json
 from rest_framework.views import APIView
@@ -17,9 +19,9 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404, render
-from django.utils import timezone
 from django.db.models import Sum, Count
 import calendar
+from datetime import timedelta
 from . import models, serializers
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -29,6 +31,7 @@ from hr.models import Announcement
 from hr.serializers import AnnouncementSerializer
 from datetime import datetime
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 
 User = get_user_model()
@@ -84,7 +87,11 @@ class UpdateContactView(APIView):
     def patch(self, request):
         prof = request.user.employeeprofile
         serializer = serializers.EmployeeContactUpdateSerializer(
-            prof, data=request.data, partial=True)
+            prof,
+            data=request.data,
+            partial=True,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -96,7 +103,11 @@ class UpdateIdentificationView(APIView):
     def patch(self, request):
         prof = request.user.employeeprofile
         serializer = serializers.EmployeeIdentificationSerializer(
-            prof, data=request.data, partial=True)
+            prof,
+            data=request.data,
+            partial=True,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -200,18 +211,60 @@ class ClockInAPIView(APIView):
 class ClockOutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def clockout_reminder_logic(self, att):
+        now = timezone.now()
+        worked_time = now - att.clock_in
+
+        if worked_time < timedelta(hours=2):
+            return None
+
+        if att.reminder_count >= 4:
+            return None
+
+        if att.last_reminder_at:
+            next_allowed_time = att.last_reminder_at + timedelta(minutes=15)
+            if now < next_allowed_time:
+                return None
+
+        att.reminder_count += 1
+        att.last_reminder_at = now
+        att.save(update_fields=["reminder_count", "last_reminder_at"])
+
+        return f"Reminder {att.reminder_count}/4: You have completed 9 hours. Please clock out."
+
     def post(self, request):
         user = request.user
         today = timezone.localdate()
-        att = models.Attendance.objects.filter(user=user, date=today).first()
+
+        att = models.Attendance.objects.filter(
+            user=user,
+            date=today
+        ).first()
+
         if not att:
-            return Response({"detail": "No clock-in found for today."}, status=400)
+            return Response(
+                {"detail": "No clock-in found for today."},
+                status=400
+            )
+
         if att.clock_out:
-            return Response({"detail": "Already clocked out."}, status=400)
+            return Response(
+                {"detail": "Already clocked out."},
+                status=400
+            )
+
+        reminder = self.clockout_reminder_logic(att)
+
         att.clock_out = timezone.now()
         att.compute_duration_and_overtime()
         att.save()
-        return Response(serializers.AttendanceReadSerializer(att).data)
+
+        data = serializers.AttendanceReadSerializer(att).data
+
+        if reminder:
+            data["reminder"] = reminder
+
+        return Response(data, status=200)
 
 
 class MyAttendanceDaysAPIView(generics.ListAPIView):
@@ -228,6 +281,47 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
             return models.Attendance.objects.filter(user=user).order_by('-date')[:30]
 
 
+class TodayAttendanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        today = timezone.localdate()
+
+        if user.role == "employee":
+            qs = Attendance.objects.filter(
+                user=user,
+                date=today
+            )
+
+        elif user.role == "tl":
+            qs = Attendance.objects.filter(
+                date=today,
+                user__role="employee"
+            ).exclude(
+                user__role__in=["tl", "hr"]
+            )
+
+        elif user.role == "hr":
+            qs = Attendance.objects.filter(
+                date=today,
+                user__role="employee"
+            ).exclude(
+                user__role__in=["tl", "hr"]
+            )
+
+        else:
+            return Response(
+                {"detail": "Unauthorized"},
+                status=403
+            )
+
+        qs = qs.select_related("user").order_by("user__username")
+
+        serializer = TodayAttendanceSerializer(qs, many=True)
+        return Response(serializer.data, status=200)
+
+
 class CalendarEventsAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = serializers.CalendarEventSerializer
@@ -238,7 +332,7 @@ class CalendarEventsAPIView(generics.ListAPIView):
         month = int(self.request.query_params.get(
             'month', timezone.localdate().month))
         q = models.CalendarEvent.objects.filter(
-            date__year=year, date__month=month)
+            date__year=year, date__month=month).order_by('date')
         return q
 
 
@@ -288,38 +382,20 @@ def mark_notifications_read(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def emp_tl_announcements(request):
-    """
-    Returns announcements created by this employee's Team Lead.
-    It supports EmployeeProfile fields named either `tl` or `team_lead`.
-    """
-    try:
-        from hr.models import EmployeeProfile
-    except Exception:
-        return Response({
-            "success": False,
-            "message": "EmployeeProfile model not available (check import path)"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    profile = EmployeeProfile.objects.get(user=request.user)
 
-    try:
-        profile = EmployeeProfile.objects.get(user=request.user)
-    except EmployeeProfile.DoesNotExist:
-        return Response({
-            "success": False,
-            "message": "Employee profile not found"
-        }, status=status.HTTP_404_NOT_FOUND)
-
-    tl = getattr(profile, "team_lead", None) or getattr(profile, "tl", None)
-
-    if tl is None:
+    if not profile.team_lead:
         return Response({
             "success": True,
-            "data": [],
-            "message": "No Team Lead assigned"
-        }, status=status.HTTP_200_OK)
+            "data": []
+        })
 
-    announcements = Announcement.objects.filter(
-        created_by=tl).order_by('-date')
+    announcements = TLAnnouncement.objects.filter(
+        created_by=profile.team_lead
+    ).order_by('-date')
+
     serializer = serializers.TLAnnouncementSerializer(announcements, many=True)
+
     return Response({
         "success": True,
         "data": serializer.data
@@ -389,6 +465,21 @@ class LeaveApplyAPIView(APIView):
         prof = request.user.employeeprofile
         start = ser.validated_data['start_date']
         end = ser.validated_data['end_date']
+
+        existing_leave = models.LeaveRequest.objects.filter(
+            profile=prof).exclude(status__in=['rejected', 'cancelled']).filter(
+            start_date__lte=end, end_date__gte=start)
+
+        if existing_leave.exists():
+            return Response(
+                {
+                    "detail": (
+                        "You already have a leave applied ",
+                        "that overlaps with the selected date(s)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if request.user.role == 'tl':
             route_direct_to_hr = True
@@ -540,6 +631,47 @@ class HRCreateEmployeeAPIView(APIView):
         return Response(EmployeeProfileReadSerializer(profile).data, status=status.HTTP_201_CREATED)
 
 
+class MySensitiveDetailsAPIView(APIView):
+    """
+    TEMPORARY sensitive data access for the logged-in employee.
+    Intended ONLY for self-verification.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        try:
+            profile = user.employeeprofile
+        except Exception:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = serializers.EmployeeSensitiveSelfSerializer(profile)
+        return Response({
+            "temporary": True,
+            "data": serializer.data
+        })
+
+
+class HREmployeeSensitiveDetailsAPIView(APIView):
+    """
+    PERMANENT sensitive data access for HR / Management.
+    """
+    permission_classes = [IsAuthenticated, IsHROrManagement]
+
+    def get(self, request, emp_id):
+        profile = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+
+        serializer = serializers.EmployeeSensitiveHRSerializer(profile)
+        return Response({
+            "hr_access": True,
+            "data": serializer.data
+        })
+
+
 class HRTLActionAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -552,10 +684,16 @@ class HRTLActionAPIView(APIView):
         if user.role == 'tl':
 
             if lr.profile.user == user:
-                return Response({'detail': 'TL cannot approve their own leave.'}, status=403)
+                return Response(
+                    {'detail': 'TL cannot approve their own leave.'},
+                    status=403
+                )
 
             if lr.status != 'applied':
-                return Response({'detail': 'TL can only act on requests with status "applied".'}, status=400)
+                return Response(
+                    {'detail': 'TL can only act on requests with status "applied".'},
+                    status=400
+                )
 
             if lr.profile.team_lead != user:
                 return Response({'detail': 'Forbidden'}, status=403)
@@ -567,13 +705,16 @@ class HRTLActionAPIView(APIView):
                     models.Notification.objects.create(
                         to_user=hr_user,
                         title=f"TL approved leave: {lr.profile.full_name()}",
-                        body=f"Leave {lr.id} ({lr.leave_type}) needs HR action.",
+                        body=f"Leave {lr.id} needs HR action.",
                         notif_type='leave',
                         extra={'leave_request_id': lr.id}
                     )
+
                 return Response({'detail': 'tl_approved'})
-            else:
+
+            elif action == 'reject':
                 lr.apply_tl_approval(user, approve=False, remarks=remarks)
+
                 models.Notification.objects.create(
                     to_user=lr.profile.user,
                     title='Leave rejected by TL',
@@ -581,42 +722,48 @@ class HRTLActionAPIView(APIView):
                     notif_type='leave',
                     extra={'leave_request_id': lr.id}
                 )
+
                 return Response({'detail': 'tl_rejected'})
 
-        if getattr(user, 'role', None) in ('hr', 'management'):
+            return Response({'detail': 'Invalid action'}, status=400)
+
+        if user.role in ('hr', 'management'):
+
+            if lr.status == 'tl_rejected':
+                return Response(
+                    {'detail': 'HR cannot take action because TL rejected this leave.'},
+                    status=403
+                )
 
             if lr.status not in ('tl_approved', 'pending_hr'):
-                return Response({'detail': 'HR can only act on requests that are approved by TL or routed to HR.'}, status=400)
+                return Response(
+                    {'detail': 'HR cannot take action at this stage.'},
+                    status=403
+                )
+
+            if action not in ('approve', 'reject'):
+                return Response({'detail': 'Invalid action'}, status=400)
 
             if action == 'approve':
-                lr.apply_hr_approval(user, approve=True, remarks=remarks)
-
                 try:
-                    lb = models.LeaveBalance.objects.get(
-                        profile=lr.profile, leave_type__name=lr.leave_type)
-                    lb.used = lb.used + lr.days
-                    lb.save()
-                except Exception:
+                    lr.apply_hr_approval(user, approve=True, remarks=remarks)
+                except DjangoValidationError as e:
+                    return Response(
+                        {'detail': e.messages},
+                        status=403
+                    )
 
-                    pass
-
-                models.Notification.objects.create(
-                    to_user=lr.profile.user,
-                    title='Leave approved',
-                    body=remarks or 'Your leave has been approved',
-                    notif_type='leave',
-                    extra={'leave_request_id': lr.id}
-                )
                 return Response({'detail': 'hr_approved'})
-            else:
-                lr.apply_hr_approval(user, approve=False, remarks=remarks)
-                models.Notification.objects.create(
-                    to_user=lr.profile.user,
-                    title='Leave rejected by HR',
-                    body=remarks or 'Your leave was rejected by HR',
-                    notif_type='leave',
-                    extra={'leave_request_id': lr.id}
-                )
+
+            if action == 'reject':
+                try:
+                    lr.apply_hr_approval(user, approve=False, remarks=remarks)
+                except DjangoValidationError as e:
+                    return Response(
+                        {'detail': e.messages},
+                        status=403
+                    )
+
                 return Response({'detail': 'hr_rejected'})
 
         return Response({'detail': 'Not allowed'}, status=403)
@@ -718,7 +865,7 @@ class TimesheetDailyUpdateAPIView(APIView):
             else:
                 end_dt = timezone.make_aware(
                     datetime.combine(today, item["end_time"])
-                )   
+                )
 
             obj = TimesheetEntry.objects.create(
                 profile=prof,
@@ -1236,6 +1383,19 @@ class PolicyCreateAPIView(generics.CreateAPIView):
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsHROrManagement]
 
+    def perform_create(self, serializer):
+        policy = serializer.save()
+
+        employees = User.objects.all()  # all employees
+        for emp in employees:
+            Notification.objects.create(
+                to_user=emp,
+                title=f"New Policy Added: {policy.title}",
+                body=f"A new policy '{policy.title}' has been added.",
+                notif_type='policy',
+                is_read=False
+            )
+
 
 class PolicyRetrieveAPIView(generics.RetrieveAPIView):
     queryset = models.Policy.objects.all()
@@ -1247,3 +1407,30 @@ class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsHROrManagement]
+
+    def perform_update(self, serializer):
+        policy = serializer.save()
+
+        employees = User.objects.all()
+        for emp in employees:
+            Notification.objects.create(
+                to_user=emp,
+                title=f"Policy Updated: {policy.title}",
+                body=f"The policy '{policy.title}' has been updated.",
+                notif_type='policy',
+                is_read=False
+            )
+
+    def perform_destroy(self, instance):
+        policy_title = instance.title
+        instance.delete()
+
+        employees = User.objects.all()
+        for emp in employees:
+            Notification.objects.create(
+                to_user=emp,
+                title=f"Policy Deleted: {policy_title}",
+                body=f"The policy '{policy_title}' has been deleted.",
+                notif_type='policy',
+                is_read=False
+            )
