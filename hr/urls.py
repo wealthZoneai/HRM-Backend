@@ -12,7 +12,7 @@ urlpatterns = [
     path('employees/<int:pk>/', views.HRRetrieveEmployeeAPIView.as_view(),
          name='hr-employee-detail'),
 
-    path('employees/<int:pk>/jobbank/',
+    path('employees/<int:pk>/job&bank/',
          views.HRUpdateJobBankAPIView.as_view(), name='hr-employee-jobbank'),
 
     path('attendance/', views.HRAttendanceListAPIView.as_view(),
@@ -23,11 +23,6 @@ urlpatterns = [
 
     path('attendance/<int:attendance_id>/correct/',
          views.HRAttendanceCorrectAPIView.as_view(), name='hr-attendance-correct'),
-
-    path('shifts/', views.ShiftListCreateAPIView.as_view(), name='hr-shifts'),
-
-    path('shifts/<int:pk>/', views.ShiftRetrieveUpdateAPIView.as_view(),
-         name='hr-shift-detail'),
 
     path('calendar/create/', views.HRCalendarCreateAPIView.as_view(),
          name='hr-calendar-create'),

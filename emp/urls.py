@@ -3,6 +3,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('dashboard/summary/', views.DashboardSummaryAPIView.as_view(),
+         name='dashboard-summary'),
+
     path('my-profile/', views.MyProfileView.as_view(), name='my-profile'),
 
     path('my-profile/contact/', views.UpdateContactView.as_view(),
@@ -11,31 +14,20 @@ urlpatterns = [
     path('my-profile/identification/', views.UpdateIdentificationView.as_view(),
          name='my-profile-identification'),
 
-    path('dashboard/summary/', views.DashboardSummaryAPIView.as_view(),
-         name='dashboard-summary'),
+    path("my-profile/sensitive/", views.MySensitiveDetailsAPIView.as_view(),
+         name="my_sensitive_details"),
 
     path('attendance/clock-in/', views.ClockInAPIView.as_view(), name='clock-in'),
 
     path('attendance/clock-out/', views.ClockOutAPIView.as_view(), name='clock-out'),
 
-    path('attendance/days/', views.MyAttendanceDaysAPIView.as_view(),
-         name='attendance-days'),
-
     path('attendance/today/', views.TodayAttendanceView.as_view(),
          name='today-attendance'),
 
+    path('attendance/days/', views.MyAttendanceDaysAPIView.as_view(),
+         name='attendance-days'),
+
     path('calendar/events/', views.CalendarEventsAPIView.as_view(), name='calendar'),
-
-    path("announcements/", views.emp_all_announcements,
-         name="emp_all_announcements"),
-
-    path('notifications/', views.emp_notifications, name="emp_notifications"),
-
-    path('notifications/mark-read/', views.mark_notifications_read,
-         name="mark_notifications_read"),
-
-    path('tl-announcements/', views.emp_tl_announcements,
-         name='employee_tl_announcements'),
 
     path('payroll/my-details/',
          views.MySalaryDetailsAPIView.as_view(), name='my-salary'),
@@ -61,17 +53,22 @@ urlpatterns = [
     path('policy/<int:pk>/', views.PolicyUpdateDeleteAPIView.as_view(),
          name='policy-detail'),
 
+    path("announcements/", views.emp_all_announcements,
+         name="emp_all_announcements"),
+
+    path('notifications/', views.emp_notifications, name="emp_notifications"),
+
+    path('notifications/mark-read/', views.mark_notifications_read,
+         name="mark_notifications_read"),
+
+    path('tl-announcements/', views.emp_tl_announcements,
+         name='employee_tl_announcements'),
+
     path('hr/create-employee/', views.HRCreateEmployeeAPIView.as_view(),
          name='hr-create-employee'),
 
-    path("my-profile/sensitive/", views.MySensitiveDetailsAPIView.as_view(),
-         name="my_sensitive_details"),
-
     path("hr/employee/<str:emp_id>/sensitive/",
          views.HREmployeeSensitiveDetailsAPIView.as_view(), name="hr_employee_sensitive_details"),
-
-    path('action/leave/<int:leave_id>/',
-         views.HRTLActionAPIView.as_view(), name='tl-hr-leave-action'),
 
     path('timesheet/daily/update/', views.TimesheetDailyUpdateAPIView.as_view(),
          name='timesheet_daily_update'),
