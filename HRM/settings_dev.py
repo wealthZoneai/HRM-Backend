@@ -12,10 +12,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'hrms_dev',
+        'NAME': 'test',
         'USER': 'postgres',
-        'PASSWORD': 'Dinesh@41216',
-        'HOST': '192.168.1.42',
+        'PASSWORD': 'Ajay@2002',
+        'HOST': '192.168.1.6',
         'PORT': '5432',
     }
 }

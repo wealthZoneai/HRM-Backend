@@ -23,10 +23,10 @@ urlpatterns = [
     path("tl/calendar/create/", views.TLCreateEventAPIView.as_view(),
          name="calendar-create"),
 
-    path('tl/calendar/<int:pk/update/',
+    path('tl/calendar/<int:pk>/update/',
          views.TLCalendarUpdateAPIView.as_view(), name='tl_calendar_update'),
 
-    path('tl/calendar/<int:pk/delete/',
+    path('tl/calendar/<int:pk>/delete/',
          views.TLCalendarDeleteAPIView.as_view(), name='tl_calendar_delete'),
 
     path("tl/announcement/create/", views.tl_create_announcement,
