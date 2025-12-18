@@ -973,10 +973,16 @@ class TimesheetDailyUpdateAPIView(APIView):
 
         total_seconds = sum(o.duration_seconds or 0 for o in saved)
 
+        entries_out = TimesheetEntrySerializer(saved, many=True).data
+
         return Response({
             "message": "Timesheet saved (not submitted)",
             "date": date,
-            "total_hours": round(total_seconds / 3600, 2)
+            "is_submitted": ts_day.is_submitted,
+            "clock_in": ts_day.clock_in,
+            "clock_out": ts_day.clock_out,
+            "total_hours": round(total_seconds / 3600, 2),
+            "entries": entries_out
         }, status=201)
 
 
