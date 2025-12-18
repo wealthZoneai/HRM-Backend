@@ -6,6 +6,7 @@ from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
 from datetime import timedelta
 from decimal import Decimal
+from .constants import LEAVE_TYPE_CHOICES
 
 
 User = settings.AUTH_USER_MODEL
@@ -424,7 +425,7 @@ class LeaveType(models.Model):
 class LeaveBalance(models.Model):
     profile = models.ForeignKey(
         EmployeeProfile, on_delete=models.CASCADE, related_name='leave_balances')
-    leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES)
     total_allocated = models.DecimalField(
         max_digits=6, decimal_places=2, default=0.0)
     used = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
@@ -449,7 +450,7 @@ class LeaveRequest(models.Model):
     ]
     profile = models.ForeignKey(
         EmployeeProfile, on_delete=models.CASCADE, related_name='leave_requests')
-    leave_type = models.CharField(max_length=120)
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES)
     start_date = models.DateField()
     end_date = models.DateField()
     days = models.DecimalField(max_digits=5, decimal_places=2)

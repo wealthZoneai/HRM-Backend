@@ -15,6 +15,8 @@ from django.contrib.auth import get_user_model
 from datetime import datetime
 from django.utils import timezone
 from django.urls import reverse
+from .constants import LEAVE_TYPE_CHOICES
+from decimal import Decimal
 
 User = get_user_model()
 
@@ -634,48 +636,45 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
 
 
 class LeaveApplySerializer(serializers.Serializer):
-    leave_type = serializers.CharField(
-        max_length=120)
+    leave_type = serializers.CharField(max_length=20)
     start_date = serializers.DateField()
     end_date = serializers.DateField()
     reason = serializers.CharField(allow_blank=True, required=False)
 
     def validate(self, data):
-        """
-        - Ensure start/end date sanity
-        - Check for overlapping leave requests for the same profile
-        - Verify leave_type exists
-        - Verify the profile has sufficient available balance for the requested days
-        NOTE: serializer expects the request in self.context['request'] so the profile can be accessed.
-        """
-        from django.db.models import Q
-        from decimal import Decimal
         today = timezone.localdate()
-        start = data.get('start_date')
-        end = data.get('end_date')
+        start = data["start_date"]
+        end = data["end_date"]
 
+        # ❌ Past dates not allowed
         if start < today:
             raise serializers.ValidationError(
-                {"start_date": "Start date cannot be in the past."})
+                {"start_date": "Start date cannot be in the past."}
+            )
+
         if end < start:
             raise serializers.ValidationError(
-                {"end_date": "End date cannot be before start date."})
+                {"end_date": "End date cannot be before start date."}
+            )
 
         requested_days = (end - start).days + 1
 
-        req = self.context.get('request')
-        if not req or not getattr(req, 'user', None):
-
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
             return data
 
-        profile = getattr(req.user, 'employeeprofile', None)
+        profile = getattr(request.user, "employeeprofile", None)
         if not profile:
             raise serializers.ValidationError(
-                "Employee profile not found for current user.")
+                "Employee profile not found for current user."
+            )
 
+        # ❌ Overlapping leave check
         overlapping = LeaveRequest.objects.filter(
             profile=profile
-        ).exclude(status__in=['tl_rejected', 'hr_rejected']).filter(
+        ).exclude(
+            status__in=["tl_rejected", "hr_rejected"]
+        ).filter(
             start_date__lte=end,
             end_date__gte=start
         ).exists()
@@ -685,32 +684,41 @@ class LeaveApplySerializer(serializers.Serializer):
                 {"non_field_errors": "You already have a leave request that overlaps these dates."}
             )
 
-        leave_type_name = data.get('leave_type', '').strip()
-        lt = LeaveType.objects.filter(
-            name__iexact=leave_type_name).first()
-        if not lt:
+        # ✅ Validate leave type (ENUM)
+        valid_leave_types = [c[0] for c in LEAVE_TYPE_CHOICES]
+        leave_type = data["leave_type"]
+
+        if leave_type not in valid_leave_types:
             raise serializers.ValidationError(
-                {"leave_type": f"Leave type '{leave_type_name}' not found."}
+                {"leave_type": "Invalid leave type."}
             )
 
+        # ✅ Leave balance check (ENUM-based)
         lb = LeaveBalance.objects.filter(
-            profile=profile, leave_type=lt).first()
-        if lb:
+            profile=profile,
+            leave_type=leave_type
+        ).first()
 
+        if lb:
             try:
                 available = Decimal(lb.total_allocated) - Decimal(lb.used)
             except Exception:
-
                 available = None
-            if available is not None:
-                if Decimal(requested_days) > available:
-                    raise serializers.ValidationError(
-                        {"non_field_errors": f"Insufficient leave balance for '{lt.name}'. Requested: {requested_days}, Available: {available}."}
-                    )
 
-        data['calculated_days'] = requested_days
+            if available is not None and Decimal(requested_days) > available:
+                label = dict(LEAVE_TYPE_CHOICES).get(leave_type, leave_type)
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": (
+                            f"Insufficient leave balance for '{label}'. "
+                            f"Requested: {requested_days}, Available: {available}."
+                        )
+                    }
+                )
 
-        data['normalized_leave_type'] = lt.name
+        # ✅ Store computed values
+        data["calculated_days"] = requested_days
+        data["normalized_leave_type"] = leave_type
 
         return data
 
