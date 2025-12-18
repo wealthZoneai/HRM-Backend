@@ -12,6 +12,13 @@ urlpatterns = [
     path('employees/<int:pk>/', views.HRRetrieveEmployeeAPIView.as_view(),
          name='hr-employee-detail'),
 
+    path("hr/employees/<int:pk>/contact/", views.HRUpdateEmployeeContactAPIView.as_view(),
+         name='hr-employee-contact-update'),
+
+    path("hr/employees/<int:pk>/role/",
+         views.HRUpdateEmployeeRoleAPIView.as_view(), name='hr-employee-role-update'),
+
+
     path('employees/<int:pk>/job&bank/',
          views.HRUpdateJobBankAPIView.as_view(), name='hr-employee-jobbank'),
 

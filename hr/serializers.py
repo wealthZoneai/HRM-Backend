@@ -26,6 +26,49 @@ class EmployeeListSerializer(serializers.ModelSerializer):
                   'job_title', 'department', 'role', 'start_date', 'location', 'profile_photo')
 
 
+class EmployeeHRContactUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeProfile
+        fields = (
+            "first_name",
+            "middle_name",
+            "last_name",
+            "personal_email",
+            "phone_number",
+            "alternate_number",
+            "dob",
+            "blood_group",
+            "gender",
+            "marital_status",
+        )
+
+
+class EmployeeHRRoleUpdateSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(
+        choices=[
+            ("employee", "Employee"),
+            ("intern", "Intern"),
+            ("tl", "Team Lead"),
+            ("hr", "HR"),
+            ("management", "Management"),
+        ]
+    )
+
+    class Meta:
+        model = EmployeeProfile
+        fields = ("role",)
+
+    def update(self, instance, validated_data):
+        new_role = validated_data["role"]
+
+        instance.role = new_role
+        instance.user.role = new_role
+        instance.user.save(update_fields=["role"])
+
+        instance.save(update_fields=["role"])
+        return instance
+
+
 class EmployeeDetailSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
 

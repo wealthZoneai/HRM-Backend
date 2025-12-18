@@ -25,6 +25,20 @@ from django.db import IntegrityError
 User = get_user_model()
 
 
+class HRUpdateEmployeeContactAPIView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsHR]
+    serializer_class = serializers.EmployeeHRContactUpdateSerializer
+    queryset = EmployeeProfile.objects.all()
+    lookup_field = "pk"
+
+
+class HRUpdateEmployeeRoleAPIView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsHR]
+    serializer_class = serializers.EmployeeHRRoleUpdateSerializer
+    queryset = EmployeeProfile.objects.all()
+    lookup_field = "pk"
+
+
 class HRListEmployeesAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsHR]
     serializer_class = serializers.EmployeeListSerializer

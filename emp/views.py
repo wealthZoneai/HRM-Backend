@@ -727,6 +727,8 @@ class HREmployeeSensitiveDetailsAPIView(APIView):
         })
 
 
+
+
 class HRTLActionAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
