@@ -966,8 +966,8 @@ class TimesheetDailyUpdateAPIView(APIView):
                 )
             )
 
-        ts_day.clock_in = min(o.start_time for o in saved)
-        ts_day.clock_out = max(o.end_time for o in saved)
+        ts_day.clock_in = attendance.clock_in
+        ts_day.clock_out = attendance.clock_out
         ts_day.last_modified_by = user
         ts_day.save()
 
@@ -976,7 +976,7 @@ class TimesheetDailyUpdateAPIView(APIView):
         entries_out = TimesheetEntrySerializer(saved, many=True).data
 
         return Response({
-            "message": "Timesheet saved (not submitted)",
+            "message": "Timesheet saved.",
             "date": date,
             "is_submitted": ts_day.is_submitted,
             "clock_in": ts_day.clock_in,
