@@ -1,4 +1,5 @@
 # emp/serializers.py
+from django.core.exceptions import ValidationError
 from urllib3 import request
 from .models import TimesheetEntry, TimesheetDay, Attendance
 from rest_framework import serializers
@@ -8,6 +9,8 @@ from .models import (
     SalaryStructure, EmployeeSalary, Payslip,
     LeaveType, LeaveBalance, LeaveRequest, Policy
 )
+import re
+import unicodedata
 from django.contrib.auth import get_user_model
 from datetime import datetime
 from django.utils import timezone
@@ -90,6 +93,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
         ],
         default='employee'
     )
+
     emp_id = serializers.CharField(
         required=False, allow_blank=True, max_length=50)
     work_email = serializers.EmailField(required=False, allow_blank=True)
@@ -99,38 +103,47 @@ class EmployeeCreateSerializer(serializers.Serializer):
     bank = BankSerializer(required=False)
     identification = IdentificationSerializer(required=False)
 
+    def _normalize_name(self, value: str) -> str:
+        if not value:
+            return ""
+        value = unicodedata.normalize("NFKD", value)
+        value = value.encode("ascii", "ignore").decode("ascii")
+        value = re.sub(r"\s+", " ", value)
+        return value.strip()
+
+    def _username_part(self, value: str) -> str:
+        value = value.replace(" ", "").lower()
+        value = re.sub(r"[^a-z0-9]", "", value)
+        return value
+
     def validate_work_email(self, value):
-        if value and User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError(
-                "User with this email already exists.")
+        if value:
+            value = re.sub(r"\s+", "", value)
+            if User.objects.filter(email__iexact=value).exists():
+                raise serializers.ValidationError(
+                    "User with this email already exists."
+                )
         return value
 
     def validate(self, data):
-        """
-        Validate job.team_lead only if provided.
-        TL is optional in employee creation. If provided, it must resolve to a valid User.
-        """
         job = data.get('job', {}) or {}
         tl_val = job.get('team_lead')
 
         if not tl_val:
             return data
 
-        try:
-            if str(tl_val).isdigit():
-                user = User.objects.filter(id=int(tl_val)).first()
-            else:
-                user = (
-                    User.objects.filter(username__iexact=tl_val).first()
-                    or User.objects.filter(email__iexact=tl_val).first()
-                )
-        except Exception:
-            user = None
+        if str(tl_val).isdigit():
+            user = User.objects.filter(id=int(tl_val)).first()
+        else:
+            user = (
+                User.objects.filter(username__iexact=tl_val).first()
+                or User.objects.filter(email__iexact=tl_val).first()
+            )
 
         if not user:
             raise ValidationError({
                 "job": {
-                    "team_lead": "Invalid team_lead: user not found (provide user id, username or email)."
+                    "team_lead": "Invalid team_lead: user not found."
                 }
             })
 
@@ -150,17 +163,34 @@ class EmployeeCreateSerializer(serializers.Serializer):
         bank = validated_data.get('bank', {})
         identification = validated_data.get('identification', {})
 
-        first_name = (contact.get('first_name') or '').strip()
-        last_name = (contact.get('last_name') or '').strip()
-        role = validated_data.get('role', 'employee')
-        email = (validated_data.get('work_email') or '').strip() or None
+        first_name = self._normalize_name(contact.get('first_name'))
+        last_name = self._normalize_name(contact.get('last_name'))
 
-        base_username = f"{first_name.lower()}.{last_name.lower()}" if first_name or last_name else "user"
+        username_first = self._username_part(first_name)
+        username_last = self._username_part(last_name)
+
+        base_username = ".".join(filter(None, [username_first, username_last]))
+        base_username = base_username.strip(".") or "user"
+
         username = base_username
         counter = 1
         while User.objects.filter(username=username).exists():
             username = f"{base_username}{counter}"
             counter += 1
+
+        raw_email = validated_data.get('work_email')
+
+        if raw_email:
+            # If HR provided email, clean it
+            email = re.sub(r"\s+", "", raw_email)
+        else:
+            # Auto-generate email from sanitized username parts
+            email_local = ".".join(
+                filter(None, [username_first, username_last]))
+            email_local = email_local.strip(".") or "user"
+            email = f"{email_local}@wealthzonegroupai.com"
+
+        role = validated_data.get('role', 'employee')
 
         user = User.objects.create_user(
             username=username,
@@ -171,23 +201,20 @@ class EmployeeCreateSerializer(serializers.Serializer):
             role=role
         )
         user.set_unusable_password()
-        user.save()
+        user.save(update_fields=["password"])
 
         prof, created = EmployeeProfile.objects.get_or_create(
             user=user,
             defaults={
                 'emp_id': validated_data.get('emp_id') or '',
                 'work_email': email or '',
-                'first_name': first_name or '',
-                'last_name': last_name or '',
+                'first_name': first_name,
+                'last_name': last_name,
             }
         )
 
         if prof.role != role:
             prof.role = role
-
-        if validated_data.get('emp_id'):
-            prof.emp_id = validated_data.get('emp_id')
 
         prof.first_name = first_name or prof.first_name
         prof.middle_name = contact.get('middle_name') or prof.middle_name
@@ -202,57 +229,51 @@ class EmployeeCreateSerializer(serializers.Serializer):
         prof.gender = contact.get('gender') or prof.gender
         prof.marital_status = contact.get(
             'marital_status') or prof.marital_status
+
         if contact.get('profile_photo') is not None:
             prof.profile_photo = contact.get('profile_photo')
 
         prof.job_title = job.get('job_title') or prof.job_title
-        prof.department = job.get('department')
-
-        tl_val = job.get('team_lead')
-        if tl_val:
-            prof.team_lead_id = int(tl_val)
-
+        prof.department = job.get('department') or prof.department
         prof.employment_type = job.get(
             'employment_type') or prof.employment_type
         prof.start_date = job.get('start_date') or prof.start_date
         prof.location = job.get('location') or prof.location
         prof.job_description = job.get(
             'job_description') or prof.job_description
+
+        if job.get('team_lead'):
+            prof.team_lead_id = int(job.get('team_lead'))
+
         if job.get('id_image') is not None:
             prof.id_image = job.get('id_image')
 
-        prof.bank_name = bank.get('bank_name') or prof.bank_name
-        prof.ifsc_code = bank.get('ifsc_code') or prof.ifsc_code
-        prof.account_number = bank.get('account_number') or prof.account_number
-        prof.branch = bank.get('branch') or prof.branch
+        if bank:
+            prof.bank_name = bank.get('bank_name') or prof.bank_name
+            prof.ifsc_code = bank.get('ifsc_code') or prof.ifsc_code
+            prof.account_number = bank.get(
+                'account_number') or prof.account_number
+            prof.branch = bank.get('branch') or prof.branch
 
-        prof.aadhaar_number = identification.get(
-            'aadhaar_number') or prof.aadhaar_number
-        if identification.get('aadhaar_image') is not None:
-            prof.aadhaar_image = identification.get('aadhaar_image')
-        prof.pan = identification.get('pan_number') or prof.pan
-        if identification.get('pan_image') is not None:
-            prof.pan_image = identification.get('pan_image')
-        prof.passport_number = identification.get(
-            'passport_number') or prof.passport_number
-        if identification.get('passport_image') is not None:
-            prof.passport_image = identification.get('passport_image')
+        if identification:
+            prof.aadhaar_number = identification.get(
+                'aadhaar_number') or prof.aadhaar_number
+            if identification.get('aadhaar_image') is not None:
+                prof.aadhaar_image = identification.get('aadhaar_image')
+
+            prof.pan = identification.get('pan_number') or prof.pan
+            if identification.get('pan_image') is not None:
+                prof.pan_image = identification.get('pan_image')
+
+            prof.passport_number = identification.get(
+                'passport_number') or prof.passport_number
+            if identification.get('passport_image') is not None:
+                prof.passport_image = identification.get('passport_image')
 
         if email:
             prof.work_email = email
 
-        update_fields = [
-            'emp_id', 'work_email', 'first_name', 'middle_name', 'last_name',
-            'personal_email', 'phone_number', 'alternate_number', 'dob',
-            'blood_group', 'gender', 'marital_status',
-            'job_title', 'department', 'team_lead', 'employment_type',
-            'start_date', 'location', 'job_description', 'id_image',
-            'bank_name', 'ifsc_code', 'account_number', 'branch',
-            'aadhaar_number', 'aadhaar_image', 'pan', 'pan_image',
-            'passport_number', 'passport_image', 'profile_photo', 'role'
-        ]
-        valid_update_fields = [f for f in update_fields if hasattr(prof, f)]
-        prof.save(update_fields=valid_update_fields)
+        prof.save()
 
         return user, prof
 
