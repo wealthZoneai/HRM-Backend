@@ -15,7 +15,7 @@ DATABASES = {
         'NAME': 'first_phase',
         'USER': 'postgres',
         'PASSWORD': 'Dinesh@41216',
-        'HOST': '192.168.1.13',
+        'HOST': '192.168.1.3',
         'PORT': '5432',
     }
 }
