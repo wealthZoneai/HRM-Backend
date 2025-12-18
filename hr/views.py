@@ -453,6 +453,13 @@ class HRLeaveActionAPIView(APIView):
 
         lr = get_object_or_404(LeaveRequest, id=leave_id)
 
+        # 🔒 If TL exists, HR must wait for TL approval
+        if lr.tl is not None and lr.status != "tl_approved":
+            return Response(
+                {"detail": "TL approval required before HR action."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         try:
             if action == 'approve':
                 lr.apply_hr_approval(

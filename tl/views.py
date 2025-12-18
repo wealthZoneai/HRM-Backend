@@ -62,12 +62,21 @@ class TLApproveRejectLeaveAPIView(APIView):
         action = request.data.get("action")
         remarks = request.data.get("remarks", "")
 
+        if action not in ("approve", "reject"):
+            return Response(
+                {"detail": "Action is required and must be 'approve' or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if action == "approve":
             leave.apply_tl_approval(
                 request.user, approve=True, remarks=remarks)
             return Response({"detail": "TL approved leave."})
 
-        leave.apply_tl_approval(request.user, approve=False, remarks=remarks)
+        # action == "reject"
+        leave.apply_tl_approval(
+            request.user, approve=False, remarks=remarks
+        )
         return Response({"detail": "TL rejected leave."})
 
 
