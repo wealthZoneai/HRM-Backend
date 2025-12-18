@@ -639,7 +639,8 @@ class LeaveApplySerializer(serializers.Serializer):
     leave_type = serializers.CharField(max_length=20)
     start_date = serializers.DateField()
     end_date = serializers.DateField()
-    reason = serializers.CharField(allow_blank=True, required=False)
+    reason = serializers.CharField(
+        required=True, allow_blank=False, max_length=500)
 
     def validate(self, data):
         today = timezone.localdate()
