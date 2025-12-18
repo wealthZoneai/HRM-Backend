@@ -931,12 +931,23 @@ class TimesheetDailyUpdateAPIView(APIView):
 
         date = serializer.validated_data["date"]
         entries = serializer.validated_data["entries"]
-        attendance = serializer.validated_data["attendance"]
 
-        ts_day, _ = TimesheetDay.objects.get_or_create(
+        # 🔒 ALWAYS fetch fresh attendance from DB (single source of truth)
+        attendance = Attendance.objects.filter(
+            user=user,
+            date=date
+        ).first()
+
+        if not attendance or not attendance.clock_in:
+            return Response(
+                {"detail": "Attendance clock-in not found for this date."},
+                status=400
+            )
+
+        # 🔗 Ensure TimesheetDay is ALWAYS linked to attendance
+        ts_day, created = TimesheetDay.objects.get_or_create(
             profile=prof,
-            date=date,
-            defaults={"attendance": attendance}
+            date=date
         )
 
         if ts_day.is_submitted:
@@ -945,14 +956,21 @@ class TimesheetDailyUpdateAPIView(APIView):
                 status=400
             )
 
-        # ❌ REMOVE OLD ENTRIES
+        # 🔄 Force-correct linkage (important for old rows)
+        ts_day.attendance = attendance
+
+        # ❌ Remove existing entries (safe because not submitted)
         TimesheetEntry.objects.filter(profile=prof, date=date).delete()
 
         saved = []
         for e in entries:
-            start_dt = timezone.make_aware(
-                datetime.combine(date, e["start_time"]))
-            end_dt = timezone.make_aware(datetime.combine(date, e["end_time"]))
+            # ✅ Use local timezone correctly (NO double make_aware)
+            start_dt = timezone.localtime(
+                timezone.datetime.combine(date, e["start_time"])
+            )
+            end_dt = timezone.localtime(
+                timezone.datetime.combine(date, e["end_time"])
+            )
 
             saved.append(
                 TimesheetEntry.objects.create(
@@ -966,21 +984,29 @@ class TimesheetDailyUpdateAPIView(APIView):
                 )
             )
 
+        # ✅ Attendance controls clock-in / clock-out — ALWAYS
         ts_day.clock_in = attendance.clock_in
         ts_day.clock_out = attendance.clock_out
         ts_day.last_modified_by = user
-        ts_day.save()
+        ts_day.save(
+            update_fields=[
+                "attendance",
+                "clock_in",
+                "clock_out",
+                "last_modified_by",
+                "updated_at",
+            ]
+        )
 
         total_seconds = sum(o.duration_seconds or 0 for o in saved)
-
         entries_out = TimesheetEntrySerializer(saved, many=True).data
 
         return Response({
             "message": "Timesheet saved.",
             "date": date,
             "is_submitted": ts_day.is_submitted,
-            "clock_in": ts_day.clock_in,
-            "clock_out": ts_day.clock_out,
+            "clock_in": attendance.clock_in,
+            "clock_out": attendance.clock_out,
             "total_hours": round(total_seconds / 3600, 2),
             "entries": entries_out
         }, status=201)
