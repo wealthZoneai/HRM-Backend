@@ -5,6 +5,8 @@ from django.conf import settings
 from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
 from datetime import timedelta
+from decimal import Decimal
+
 
 User = settings.AUTH_USER_MODEL
 
@@ -88,6 +90,9 @@ class EmployeeProfile(models.Model):
 
     department = models.CharField(
         max_length=100, choices=DEPARTMENT_CHOICES, blank=True, null=True)
+
+    designation = models.CharField(max_length=100, null=True, blank=True)
+    date_of_joining = models.DateField(null=True, blank=True)
 
     team_lead = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -284,17 +289,33 @@ class CalendarEvent(models.Model):
 class SalaryStructure(models.Model):
     name = models.CharField(max_length=150)
     monthly_ctc = models.DecimalField(max_digits=12, decimal_places=2)
-    basic_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=50.0)
-    hra_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=20.0)
-    other_allowances = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0.0)
-    overtime_multiplier = models.DecimalField(
-        max_digits=4, decimal_places=2, default=1.25)
 
+    basic_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=50.00)
+    hra_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=45.00)
+
+    other_allowances = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00
+    )
+
+    overtime_multiplier = models.DecimalField(
+        max_digits=4, decimal_places=2, default=1.25
+    )
+
+    # ✅ COMPANY RULES (DECIMAL SAFE)
     def basic_amount(self):
-        return (self.monthly_ctc * (self.basic_percent / 100))
+        return self.monthly_ctc * (self.basic_percent / Decimal("100"))
+
+    def hra_amount(self):
+        return self.monthly_ctc * (self.hra_percent / Decimal("100"))
+
+    def pf_amount(self):
+        # PF = 50% of BASIC
+        return self.basic_amount() * Decimal("0.50")
+
+    def gross_amount(self):
+        return self.monthly_ctc
 
     def __str__(self):
         return f"{self.name} ({self.monthly_ctc})"
@@ -302,42 +323,69 @@ class SalaryStructure(models.Model):
 
 class EmployeeSalary(models.Model):
     profile = models.OneToOneField(
-        EmployeeProfile, on_delete=models.CASCADE, related_name='salary')
-    structure = models.ForeignKey(SalaryStructure, on_delete=models.PROTECT)
+        EmployeeProfile,
+        on_delete=models.CASCADE,
+        related_name="salary"
+    )
+    structure = models.ForeignKey(
+        SalaryStructure,
+        on_delete=models.PROTECT
+    )
     effective_from = models.DateField()
     is_active = models.BooleanField(default=True)
 
     def hourly_rate(self, working_days_in_month=22, hours_per_day=8):
-        basic = float(self.structure.monthly_ctc) * \
-            (float(self.structure.basic_percent) / 100.0)
-        denom = working_days_in_month * hours_per_day
+        basic = self.structure.basic_amount()
+        denom = Decimal(working_days_in_month * hours_per_day)
         if denom == 0:
-            return 0.0
+            return Decimal("0.00")
         return basic / denom
+
+    def __str__(self):
+        return f"{self.profile.user.username} - {self.structure.name}"
 
 
 class Payslip(models.Model):
     profile = models.ForeignKey(
-        EmployeeProfile, on_delete=models.CASCADE, related_name='payslips')
+        EmployeeProfile,
+        on_delete=models.CASCADE,
+        related_name="emp_payslips"
+    )
+
     year = models.PositiveIntegerField()
     month = models.PositiveIntegerField()
-    working_days = models.IntegerField(default=0)
-    days_present = models.IntegerField(default=0)
+
+    working_days = models.PositiveIntegerField(default=0)
+    days_present = models.PositiveIntegerField(default=0)
+
     gross_amount = models.DecimalField(max_digits=12, decimal_places=2)
     overtime_amount = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0)
+        max_digits=12, decimal_places=2, default=0.00
+    )
     deductions = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0)
+        max_digits=12, decimal_places=2, default=0.00
+    )
     net_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
     details = models.JSONField(null=True, blank=True)
+
     generated_at = models.DateTimeField(auto_now_add=True)
     generated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="emp_generated_payslips"
+    )
+
     finalized = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('profile', 'year', 'month')
-        ordering = ['-year', '-month']
+        unique_together = ("profile", "year", "month")
+        ordering = ["-year", "-month"]
+
+    def __str__(self):
+        return f"Employee Payslip: {self.profile.user.username} - {self.month}/{self.year}"
 
 
 class LeaveType(models.Model):

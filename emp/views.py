@@ -10,6 +10,7 @@ from .serializers import (
     NotificationSerializer,
     TodayAttendanceSerializer,
 )
+from tl.serializers import TLAnnouncementSerializer
 from .models import TimesheetEntry, TimesheetDay, EmployeeProfile, Notification, Attendance
 from tl.models import TLAnnouncement
 from django.db import transaction
@@ -394,7 +395,7 @@ def emp_tl_announcements(request):
         created_by=profile.team_lead
     ).order_by('-date')
 
-    serializer = serializers.TLAnnouncementSerializer(announcements, many=True)
+    serializer = TLAnnouncementSerializer(announcements, many=True)
 
     return Response({
         "success": True,

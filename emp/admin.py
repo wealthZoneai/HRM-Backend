@@ -1,6 +1,7 @@
 # emp/admin.py
 from django.contrib import admin
 from . import models
+from .models import SalaryStructure, EmployeeSalary, Payslip
 
 
 @admin.register(models.EmployeeProfile)
@@ -43,10 +44,41 @@ class LeaveRequestAdmin(admin.ModelAdmin):
                     'end_date', 'days', 'status')
 
 
-@admin.register(models.Payslip)
+@admin.register(SalaryStructure)
+class SalaryStructureAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'name',
+        'monthly_ctc',
+        'basic_percent',
+        'hra_percent',
+        'overtime_multiplier'
+    )
+    search_fields = ('name',)
+
+
+@admin.register(EmployeeSalary)
+class EmployeeSalaryAdmin(admin.ModelAdmin):
+    list_display = (
+        'profile',
+        'structure',
+        'effective_from',
+        'is_active'
+    )
+    list_filter = ('is_active',)
+
+
+@admin.register(Payslip)
 class PayslipAdmin(admin.ModelAdmin):
-    list_display = ('profile', 'year', 'month',
-                    'gross_amount', 'net_amount', 'finalized')
+    list_display = (
+        'profile',
+        'year',
+        'month',
+        'gross_amount',
+        'net_amount',
+        'finalized'
+    )
+    list_filter = ('year', 'month', 'finalized')
 
 
 @admin.register(models.Policy)

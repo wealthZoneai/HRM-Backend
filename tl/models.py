@@ -18,5 +18,11 @@ class TLAnnouncement(models.Model):
 
     show_in_calendar = models.BooleanField(default=True)
 
+    class Meta:
+        models.UniqueConstraint(
+            fields=['date', 'time'],
+            name='unique_announcement_datetime'
+        )
+
     def __str__(self):
         return self.title

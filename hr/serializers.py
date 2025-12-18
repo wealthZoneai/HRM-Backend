@@ -4,6 +4,9 @@ from django.contrib.auth import get_user_model
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance
 from .models import Announcement
 from .models import TLAnnouncement as HR_TLAnnouncement
+from django.utils import timezone
+from datetime import datetime
+from decimal import Decimal
 
 User = get_user_model()
 
@@ -99,6 +102,38 @@ class PayslipAdminSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class MySalaryDetailSerializer(serializers.ModelSerializer):
+    basic = serializers.SerializerMethodField()
+    hra = serializers.SerializerMethodField()
+    pf = serializers.SerializerMethodField()
+    gross = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeSalary
+        fields = [
+            "basic",
+            "hra",
+            "pf",
+            "gross",
+            "effective_from",
+        ]
+
+    def get_basic(self, obj):
+        monthly_ctc = Decimal(obj.structure.monthly_ctc)
+        return monthly_ctc * Decimal(obj.structure.basic_percent) / 100
+
+    def get_hra(self, obj):
+        monthly_ctc = Decimal(obj.structure.monthly_ctc)
+        return monthly_ctc * Decimal(obj.structure.hra_percent) / 100
+
+    def get_pf(self, obj):
+        basic = self.get_basic(obj)
+        return basic * Decimal("0.50")
+
+    def get_gross(self, obj):
+        return Decimal(obj.structure.monthly_ctc)
+
+
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveType
@@ -125,7 +160,33 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Announcement
         fields = '__all__'
-        read_only_fields = ('created_by', 'date')
+        read_only_fields = ('created_by',)
+
+    def validate(self, attrs):
+        date = attrs.get('date')
+        time = attrs.get('time')
+
+        # ✅ 1. Prevent past date
+        today = timezone.localdate()
+        if date < today:
+            raise serializers.ValidationError(
+                "Past dates are not allowed."
+            )
+
+        # ✅ 2. Prevent past time for today
+        if date == today:
+            current_time = timezone.localtime().time()
+            if time <= current_time:
+                raise serializers.ValidationError(
+                    "Past time is not allowed for today's date."
+                )
+
+        # ✅ 3. Prevent duplicate date + time
+        if Announcement.objects.filter(date=date, time=time).exists():
+            raise serializers.ValidationError(
+                "An announcement already exists at this date and time."
+            )
+        return attrs
 
 
 class TLAnnouncementSerializer(serializers.ModelSerializer):

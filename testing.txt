@@ -1,0 +1,2286 @@
+
+dashboard 
+http://127.0.0.1:8000/api/dashboard/summary/ -GET
+Empty response:
+{
+    "attendance_today": null,
+    "monthly_summary": {
+        "year": 2025,
+        "month": 12,
+        "days_present": 0,
+        "hours": 0.0
+    },
+    "project_status": [],
+    "announcements": [],
+    "leave_summary": {},
+    "upcoming_holidays": []
+}
+Response:
+No changes
+
+
+
+My-profile
+http://127.0.0.1:8000/api/my-profile/ -GET
+
+Empty response:
+{
+    "user": {
+        "id": 4,
+        "username": "sanju.k",
+        "first_name": "sanju",
+        "last_name": "k",
+        "email": "sanju.k@wealthzonegroupai.com",
+        "role": "employee"
+    },
+    "emp_id": "WZG-AI-0004",
+    "work_email": "sanju.k@wealthzonegroupai.com",
+    "first_name": "sanju",
+    "middle_name": null,
+    "last_name": "k",
+    "personal_email": "sanju@gmail.com",
+    "phone_number": "9848565654",
+    "alternate_number": null,
+    "dob": "2001-05-01",
+    "blood_group": null,
+    "gender": "male",
+    "marital_status": null,
+    "job_title": "Python Developer",
+    "department": "IT",
+    "team_lead": {
+        "id": 3,
+        "username": "venky.k",
+        "first_name": "venky",
+        "last_name": "k",
+        "email": "venky.k@wealthzonegroupai.com",
+        "display": "venky k"
+    },
+    "team_lead_id": 3,
+    "employment_type": "full_time",
+    "start_date": "2025-11-01",
+    "location": null,
+    "job_description": null,
+    "protected_id_image_url": "/api/media/employee/4/id_image/",
+    "protected_profile_photo_url": "/api/media/employee/4/profile_photo/",
+    "bank_name": "SBI",
+    "ifsc_code": "SBIN0001234",
+    "masked_account_number": "******7890",
+    "branch": "Hyderabad",
+    "masked_aadhaar": null,
+    "protected_aadhaar_image_url": "/api/media/employee/4/aadhaar_image/",
+    "masked_pan": null,
+    "protected_pan_image_url": "/api/media/employee/4/pan_image/",
+    "masked_passport": null,
+    "protected_passport_image_url": "/api/media/employee/4/passport_image/",
+    "role": "employee",
+    "created_at": "2025-12-17T14:40:26.228114+05:30",
+    "updated_at": "2025-12-17T14:40:26.228143+05:30"
+}
+Response:
+No Changes
+
+My-profile-sensitive
+http://127.0.0.1:8000/api/my-profile/sensitive/ -GET
+Empty response:
+{
+    "temporary": true,
+    "data": {
+        "aadhaar_number": null,
+        "pan": null,
+        "passport_number": null,
+        "bank_name": "SBI",
+        "ifsc_code": "SBIN0001234",
+        "account_number": "1234567890",
+        "branch": "Hyderabad"
+    }
+
+
+Response:
+No changes
+
+Calendar-events
+http://127.0.0.1:8000/api/calendar/events/ -GET
+Empty response:
+{
+    "count": 0,
+    "next": null,
+    "previous": null,
+    "results": []
+}
+
+
+
+
+Response:
+No changes
+
+
+
+
+Policy
+http://127.0.0.1:8000/api/policy/ -GET
+Empty response:
+{
+    "count": 0,
+    "next": null,
+    "previous": null,
+    "results": []
+}
+
+
+
+
+Response:
+No changes
+
+Announcements
+http://127.0.0.1:8000/api/announcements/ -GET
+Empty response:
+{
+    "success": true,
+    "data": []
+}
+TL ANNOUNCEMENT-:
+http://127.0.0.1:8000/api/tl-announcements/ :- GET
+Response:-
+
+
+AttributeError at /api/tl-announcements/
+module 'emp.serializers' has no attribute 'TLAnnouncementSerializer'
+
+
+
+
+Response:
+No changes
+
+Policy-Create
+http://127.0.0.1:8000/api/policy/create/ -POST
+Empty response:
+NO
+
+
+Response:
+{
+    "detail": "You do not have permission to perform this action."
+}
+
+
+
+
+timesheet_daily_update:
+POST---- http://127.0.0.1:8000/api/timesheet/daily/update/
+Raw  à empty
+Response:
+{
+    "entries": [
+        "This field is required."
+    ]
+}
+ 
+Body(raw)
+{
+    "entries": [
+        "This field is required."
+    ]
+}
+ 
+Response
+{
+    "entries": [
+        {
+            "non_field_errors": [
+                "Invalid data. Expected a dictionary, but got str."
+            ]
+        }
+    ]
+}
+ 
+Body(raw)
+{
+    "entries": [
+        {
+            "non_field_errors":
+                "Invalid data. Expected a dictionary, but got str."
+           
+        }
+    ]
+ 
+Response:
+{
+    "entries": [
+        {
+            "start_time": [
+                "This field is required."
+            ],
+            "end_time": [
+                "This field is required."
+            ],
+            "task": [
+                "This field is required."
+            ]
+        }
+    ]
+}
+ 
+Body(raw)
+{
+    "entries": [
+        {
+            "start_time":
+                "9:00"
+            ,
+            "end_time":
+                "12:00"
+            ,
+            "task":
+                "hrm portal"
+           
+        }
+    ]
+}
+ 
+Response :
+{
+    "non_field_errors": [
+        "You must clock in (attendance) before updating today's timesheet."
+    ]
+}
+ 
+My clock in timings is 2025-12-17T15:32:19.977790+05:30
+Body(raw)
+{
+    "entries": [
+        {
+            "start_time":
+                "15:32"
+            ,
+            "end_time":
+                "15:33"
+            ,
+            "task":
+                "hrm portal"
+           
+        }
+    ]
+}
+ 
+Response:
+ 
+{
+    "entries": [
+        "Entry #1 starts before your attendance clock-in (2025-12-17 10:02:19.977790+00:00)."
+    ]
+}
+ 
+ 
+Body(raw):
+ 
+{
+    "entries": [
+        {
+            "start_time":
+                "15:33"
+            ,
+            "end_time":
+                "15:33"
+            ,
+            "task":
+                "hrm portal"
+           
+        }
+    ]
+}
+ 
+Response:
+{
+    "entries": [
+        "Entry #1 end_time must be after start_time."
+    ]
+}
+ 
+ 
+Body(response)
+{
+    "entries": [
+        {
+            "start_time":
+                "15:33"
+            ,
+            "end_time":
+                "15:36"
+            ,
+            "task":
+                "hrm portal"
+           
+        }
+    ]
+}
+ 
+Response:
+{
+    "message": "Timesheet updated successfully",
+    "date": "2025-12-17",
+    "entries": [
+        {
+            "id": 1,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:37:06.127852+05:30",
+            "updated_at": "2025-12-17T15:37:06.127860+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.05
+}
+ 
+ 
+Clockout time 2025-12-17T15:38:39.981732+05:30"
+Body(raw)
+{
+    "entries": [
+        {
+            "start_time":
+                "15:33"
+            ,
+            "end_time":
+                "15:36"
+            ,
+            "task":
+                "hrm portal"
+           
+        },
+        {
+            "start_time":
+                "15:37"
+            ,
+            "end_time":
+                "15:40"
+            ,
+            "task":
+                "employee portal"
+           
+        }
+    ]
+}
+ 
+Response:
+ 
+{
+    "entries": [
+        "Entry #2 ends after attendance clock-out (2025-12-17 10:08:39.981732+00:00)."
+    ]
+}
+ 
+Body(raw)
+{
+    "entries": [
+        {
+            "start_time":
+                "15:33"
+            ,
+            "end_time":
+                "15:36"
+            ,
+            "task":
+                "hrm portal"
+           
+        },
+        {
+            "start_time":
+                "15:37"
+            ,
+            "end_time":
+                "15:38"
+            ,
+            "task":
+                "employee portal"
+           
+        }
+    ]
+}
+ 
+ Response:
+ 
+{
+    "message": "Timesheet updated successfully",
+    "date": "2025-12-17",
+    "entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "employee portal",
+            "description": "",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.07
+}
+ 
+ 
+timesheet_daily_form:
+GET: http://127.0.0.1:8000/api/timesheet/daily/form/
+Its is when the employee is entering any fields in the updated sheet
+Here iam getting clock in and clock out files need to remove the fields
+{
+    "date": "2025-12-17",
+    "day": "Wednesday",
+    "clock_in": null,
+    "clock_out": null,
+    "existing_entries": [],
+    "total_hours_workdone": 0.0
+}
+ If I am changing this details its not changing anything
+{
+    "date": "2025-12-18",
+    "day": "Thursday",
+    "clock_in": null,
+    "clock_out": null,
+    "existing_entries": "dcdcdc",
+    "total_hours_workdone": 12
+}
+ 
+ 
+{
+    "date": "2025-12-17",
+    "day": "Wednesday",
+    "clock_in": "2025-12-17T10:03:00Z",
+    "clock_out": "2025-12-17T10:08:00Z",
+    "existing_entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "employee portal",
+            "description": "",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.07
+}
+ 
+ 
+When I am updating my  timesheet its not asking for the description but when I want to get my form the description field is showing.
+{
+    "date": "2025-12-17",
+    "day": "Wednesday",
+    "clock_in": "2025-12-17T10:03:00Z",
+    "clock_out": "2025-12-17T10:08:00Z",
+    "existing_entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "ggdjewdewd",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "abc",
+            "description": "bwdjwdbwekedced",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.07
+}
+ 
+Response:
+{
+    "date": "2025-12-17",
+    "day": "Wednesday",
+    "clock_in": "2025-12-17T10:03:00Z",
+    "clock_out": "2025-12-17T10:08:00Z",
+    "existing_entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "employee portal",
+            "description": "",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.07
+}
+ 
+timesheet_hr_daily
+ GET: http://127.0.0.1:8000/api/timesheet/hr/daily/
+http://127.0.0.1:8000/api/timesheet/hr/monthly/
+http://127.0.0.1:8000/api/timesheet/hr/worksheet/
+http://127.0.0.1:8000/api/timesheet/hr/yearly/
+http://127.0.0.1:8000/api/timesheet/tl/daily/
+ 
+ 
+It should work only with the hr credentials
+{
+    "detail": "Given token not valid for any token type",
+    "code": "token_not_valid",
+    "messages": [
+        {
+            "token_class": "AccessToken",
+            "token_type": "access",
+            "message": "Token is invalid"
+        }
+    ]
+}
+ 
+ With the hr credentials 
+{
+    "detail": "emp_id and date are required (e.g. ?emp_id=WZG-AI-0006&date=2025-12-10)."
+}
+If i give the previous date 
+http://127.0.0.1:8000/api/timesheet/hr/daily/?emp_id=WZG-AI-0006&date=2025-12-10
+{
+    "ok": true,
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "date": "2025-12-10",
+    "clock_in": null,
+    "clock_out": null,
+    "entries": [],
+    "total_hours_workdone": 0.0
+}
+Present date
+http://127.0.0.1:8000/api/timesheet/hr/daily/?emp_id=WZG-AI-0006&date=2025-12-17
+{
+    "ok": true,
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "date": "2025-12-17",
+    "clock_in": "2025-12-17T10:03:00Z",
+    "clock_out": "2025-12-17T10:08:00Z",
+    "entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "employee portal",
+            "description": "",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ],
+    "total_hours_workdone": 0.07
+}
+MONTLY 
+http://127.0.0.1:8000/api/timesheet/hr/monthly/?emp_id=WZG-AI-0006&date=2025-12-17
+{
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "month": "2025-12",
+    "total_hours_workdone": 0.07,
+    "days": [
+        {
+            "date": "2025-12-17",
+            "clock_in": "2025-12-17T10:03:00Z",
+            "clock_out": "2025-12-17T10:08:00Z",
+            "total_hours_workdone": 0.07
+        }
+    ]
+}
+
+Yearly 
+http://127.0.0.1:8000/api/timesheet/hr/yearly/?emp_id=WZG-AI-0006&year=2025
+{
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "year": "2025",
+    "year_total_hours": 0.07,
+    "months": [
+        {
+            "month": "2025-01",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-02",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-03",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-04",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-05",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-06",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-07",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-08",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-09",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-10",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-11",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2025-12",
+            "total_hours": 0.07,
+            "days": [
+                {
+                    "date": "2025-12-17",
+                    "clock_in": "2025-12-17T10:03:00Z",
+                    "clock_out": "2025-12-17T10:08:00Z",
+                    "total_hours": 0.07,
+                    "entries_count": 2
+                }
+            ]
+        }
+    ]
+}
+
+http://127.0.0.1:8000/api/timesheet/hr/yearly/?emp_id=WZG-AI-0006&year=2024
+
+{
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "year": "2024",
+    "year_total_hours": 0.0,
+    "months": [
+        {
+            "month": "2024-01",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-02",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-03",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-04",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-05",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-06",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-07",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-08",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-09",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-10",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-11",
+            "total_hours": 0.0,
+            "days": []
+        },
+        {
+            "month": "2024-12",
+            "total_hours": 0.0,
+            "days": []
+        }
+    ]
+}
+
+Worksheet
+http://127.0.0.1:8000/api/timesheet/hr/worksheet/?emp_id=WZG-AI-0006&year=2024
+{
+    "employee": "pavithra b",
+    "emp_id": "WZG-AI-0006",
+    "from": "2025-12-01",
+    "to": "2025-12-17",
+    "total_hours": 0.07,
+    "entries": [
+        {
+            "id": 2,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "hrm portal",
+            "description": "",
+            "start_time": "2025-12-17T15:33:00+05:30",
+            "end_time": "2025-12-17T15:36:00+05:30",
+            "duration_seconds": "00:03:00",
+            "duration_hours": 0.05,
+            "created_at": "2025-12-17T15:40:50.807199+05:30",
+            "updated_at": "2025-12-17T15:40:50.807213+05:30"
+        },
+        {
+            "id": 3,
+            "date": "2025-12-17",
+            "day": "Wednesday",
+            "task": "employee portal",
+            "description": "",
+            "start_time": "2025-12-17T15:37:00+05:30",
+            "end_time": "2025-12-17T15:38:00+05:30",
+            "duration_seconds": "00:01:00",
+            "duration_hours": 0.02,
+            "created_at": "2025-12-17T15:40:50.819468+05:30",
+            "updated_at": "2025-12-17T15:40:50.819478+05:30"
+        }
+    ]
+}
+
+
+HR
+ 
+api_create_announcement
+   POST:     http://127.0.0.1:8000/api/announcement/create/
+ 
+Body (raw)à Empty
+{
+    "title": [
+        "This field is required."
+    ],
+    "description": [
+        "This field is required."
+    ],
+    "time": [
+        "This field is required."
+    ],
+    "department": [
+        "This field is required."
+    ],
+    "priority": [
+        "This field is required."
+    ]
+}
+ 
+Body (raw)
+{
+    "title":
+        "Meeting"
+    ,
+    "description":
+        "meeting on project "
+    ,
+    "time":
+     "10:00",
+   
+    "department":
+        "IT"
+    ,
+    "priority":
+        "HIGH"
+   
+}
+ 
+Error:
+django.db.utils.IntegrityError: null value in column "date" of relation "hr_announcement" violates not-null constraint
+DETAIL:  Failing row contains (1, Meeting, meeting on project, null, 10:00:00, IT, HIGH, 1, t).
+ 
+Announcements_list
+GET: 	 http://127.0.0.1:8000/api/announcement/list/
+{
+    "success": true,
+    "data": []
+}
+ 
+If i want to change in the raw data
+{
+    "success": false,
+    "data": "2025-12-18"
+}
+ Nothing is changing
+ 
+ 
+Announcemnets update
+PATCH:	http://127.0.0.1:8000/api/announcement/1/update/
+If I a not creating the accouncement
+{
+    "error": "Announcement not found"
+}
+ 
+Announcemnt delete
+ 
+DELETE: 	http://127.0.0.1:8000/api/announcement/1/delete/
+ 
+{
+    "error": "Announcement not found"
+}
+ 
+ 
+emp_tl_announcements
+GET: 	http://127.0.0.1:8000/api/tl-announcements/
+{
+    "success": true,
+    "data": []
+}
+
+#Get profile
+GET - http://127.0.0.1:8000/api/my-profile/
+Response
+{
+    "user": {
+        "id": 5,
+        "username": "srinath.k",
+        "first_name": "srinath",
+        "last_name": "k",
+        "email": "srinath.k@wealthzonegroupai.com",
+        "role": "employee"
+    },
+
+
+PATCH - http://127.0.0.1:8000/api/my-profile/contact/
+Empty Reponse:
+Body:
+{
+    "personal_email": "srinath@gmail.com",
+    "phone_number": "9848565655",
+    "alternate_number": null,
+    "dob": "2001-05-01",
+    "blood_group": null,
+    "gender": "male",
+    "marital_status": null,
+    "profile_photo": null
+}
+
+PATCH - http://127.0.0.1:8000/api/my-profile/identification/
+Empty Reponse:
+Body:
+{
+    "aadhaar_number": null,
+    "pan": null,
+    "passport_number": null,
+    "aadhaar_image": null,
+    "pan_image": null,
+    "passport_image": null
+}
+
+POST-http://127.0.0.1:8000/api/attendance/clock-in/
+Empty Response:
+Body:
+{
+    "id": 1,
+    "date": "2025-12-17",
+    "clock_in": "2025-12-17T15:13:35.504505+05:30",
+    "clock_out": null,
+    "duration_time": null,
+    "duration_seconds": null,
+    "status": "working",
+    "reminder_count": 0,
+    "last_reminder_at": null,
+    "created_at": "2025-12-17T15:13:35.505951+05:30",
+    "updated_at": "2025-12-17T15:13:35.505976+05:30",
+    "user": 5
+}
+
+
+POST-http://127.0.0.1:8000/api/attendance/clock-out/
+Empty Response:
+Body:
+{
+    "id": 1,
+    "date": "2025-12-17",
+    "clock_in": "2025-12-17T15:13:35.504505+05:30",
+    "clock_out": "2025-12-17T15:15:07.779344+05:30",
+    "duration_time": "00:01:32",
+    "duration_seconds": 92,
+    "status": "absent",
+    "reminder_count": 0,
+    "last_reminder_at": null,
+    "created_at": "2025-12-17T15:13:35.505951+05:30",
+    "updated_at": "2025-12-17T15:15:07.779840+05:30",
+    "user": 5
+}
+
+GET-http://127.0.0.1:8000/api/attendance/days/
+Empty Response:
+Body:
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "date": "2025-12-17",
+            "clock_in": "2025-12-17T15:13:35.504505+05:30",
+            "clock_out": "2025-12-17T15:15:07.779344+05:30",
+            "duration_time": "00:01:32",
+            "duration_seconds": 92,
+            "status": "absent",
+            "reminder_count": 0,
+            "last_reminder_at": null,
+            "created_at": "2025-12-17T15:13:35.505951+05:30",
+            "updated_at": "2025-12-17T15:15:07.779840+05:30",
+            "user": 5
+        }
+    ]
+}
+
+GET-http://127.0.0.1:8000/api/attendance/today/
+Empty Response:
+Body:
+[
+    {
+        "user_id": 5,
+        "user_name": "srinath.k",
+        "date": "2025-12-17",
+        "clock_in": "2025-12-17T15:13:35.504505+05:30",
+        "clock_out": "2025-12-17T15:15:07.779344+05:30",
+        "duration_time": "00:01:32",
+        "status": "absent"
+    }
+]
+
+GET-http://127.0.0.1:8000/api/notifications/
+Empty Response:
+Body:
+{
+    "success": true,
+    "data": []
+}
+
+GET- http://127.0.0.1:8000/api/notifications/mark-read/
+Empty Response:
+Body:
+{
+    "success": true,
+    "message": "All notifications marked as read"
+}
+
+GET-http://127.0.0.1:8000/api/calendar/events/
+Empty Response:
+Body:
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 8,
+            "title": "Holiday",
+            "description": null,
+            "event_type": "announcement",
+            "date": "2025-12-17",
+            "start_time": null,
+            "end_time": null,
+            "created_at": "2025-12-17T16:53:40.582994+05:30",
+            "visible_to_tl_hr": true,
+            "extra": null,
+            "created_by": 1
+        },
+        {
+            "id": 9,
+            "title": "meeting",
+            "description": null,
+            "event_type": "announcement",
+            "date": "2025-12-17",
+            "start_time": null,
+            "end_time": null,
+            "created_at": "2025-12-17T16:54:25.884305+05:30",
+            "visible_to_tl_hr": true,
+            "extra": null,
+            "created_by": 1
+        }
+    ]
+}
+
+http://127.0.0.1:8000/api/leave/apply/   –GET
+
+Empty report:
+{
+    "leave_type": [
+        "This field is required."
+    ],
+    "start_date": [
+        "This field is required."
+    ],
+    "end_date": [
+        "This field is required."
+    ]
+}
+
+Raw data:
+
+{
+    "leave_type": "sick leave",
+    "start_date": "2025-01-10",
+    "end_date": "2025-01-12"
+}
+
+
+Response:
+
+{
+    "start_date": [
+        "Start date cannot be in the past."
+    ]
+}
+
+
+Raw data:
+
+{
+    "leave_type": "sick leave",
+    "start_date": "2025-12-20",
+    "end_date": "2025-12-22"
+}
+
+Response:
+
+{
+    "id": 1,
+    "name": "haritha a",
+    "emp_id": "WZG-AI-0008",
+    "role": "employee",
+    "leave_type": "Sick Leave",
+    "start_date": "2025-12-20",
+    "end_date": "2025-12-22",
+    "duration": 3,
+    "reason": "",
+    "status": "applied"
+}
+
+
+Re-apply leave in same days
+
+Raw data:
+
+{
+    "leave_type": "sick leave",
+    "start_date": "2025-12-20",
+    "end_date": "2025-12-22"
+}
+
+Response:
+
+{
+    "non_field_errors": [
+        "You already have a leave request that overlaps these dates."
+    ]
+}
+
+
+
+http://127.0.0.1:8000/api/leave/my-requests/  – GET
+
+Before TL or HR response
+
+Response:
+
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "profile": {
+                "user": {
+                    "id": 8,
+                    "username": "haritha.a",
+                    "first_name": "haritha",
+                    "last_name": "a",
+                    "email": "haritha.a@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "emp_id": "WZG-AI-0008",
+                "work_email": "haritha.a@wealthzonegroupai.com",
+                "first_name": "haritha",
+                "middle_name": null,
+                "last_name": "a",
+                "personal_email": "harith@gmail.com",
+                "phone_number": "9848565688",
+                "alternate_number": null,
+                "dob": "2001-05-01",
+                "blood_group": null,
+                "gender": "female",
+                "marital_status": null,
+                "job_title": "Python Developer",
+                "department": "IT",
+                "team_lead": {
+                    "id": 7,
+                    "username": "mohan.g",
+                    "first_name": "mohan",
+                    "last_name": "g",
+                    "email": "mohan.g@wealthzonegroupai.com",
+                    "display": "mohan g"
+                },
+                "team_lead_id": 7,
+                "employment_type": "full_time",
+                "start_date": "2025-12-01",
+                "location": null,
+                "job_description": null,
+                "protected_id_image_url": "http://127.0.0.1:8000/api/media/employee/8/id_image/",
+                "protected_profile_photo_url": "http://127.0.0.1:8000/api/media/employee/8/profile_photo/",
+                "bank_name": "SBI",
+                "ifsc_code": "SBIN0001234",
+                "masked_account_number": "******7890",
+                "branch": "Hyderabad",
+                "masked_aadhaar": null,
+                "protected_aadhaar_image_url": "http://127.0.0.1:8000/api/media/employee/8/aadhaar_image/",
+                "masked_pan": null,
+                "protected_pan_image_url": "http://127.0.0.1:8000/api/media/employee/8/pan_image/",
+                "masked_passport": null,
+                "protected_passport_image_url": "http://127.0.0.1:8000/api/media/employee/8/passport_image/",
+                "role": "employee",
+                "created_at": "2025-12-17T14:52:29.007197+05:30",
+                "updated_at": "2025-12-17T14:52:29.007227+05:30"
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-20",
+            "end_date": "2025-12-22",
+            "days": "3.00",
+            "reason": "",
+            "applied_at": "2025-12-17T15:27:11.739416+05:30",
+            "status": "applied",
+            "tl": 7,
+            "hr": null,
+            "tl_remarks": null,
+            "hr_remarks": null
+        }
+    ]
+}
+
+
+After TL and HR response
+
+Response:
+
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "profile": {
+                "user": {
+                    "id": 8,
+                    "username": "haritha.a",
+                    "first_name": "haritha",
+                    "last_name": "a",
+                    "email": "haritha.a@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "emp_id": "WZG-AI-0008",
+                "work_email": "haritha.a@wealthzonegroupai.com",
+                "first_name": "haritha",
+                "middle_name": null,
+                "last_name": "a",
+                "personal_email": "harith@gmail.com",
+                "phone_number": "9848565688",
+                "alternate_number": null,
+                "dob": "2001-05-01",
+                "blood_group": null,
+                "gender": "female",
+                "marital_status": null,
+                "job_title": "Python Developer",
+                "department": "IT",
+                "team_lead": {
+                    "id": 7,
+                    "username": "mohan.g",
+                    "first_name": "mohan",
+                    "last_name": "g",
+                    "email": "mohan.g@wealthzonegroupai.com",
+                    "display": "mohan g"
+                },
+                "team_lead_id": 7,
+                "employment_type": "full_time",
+                "start_date": "2025-12-01",
+                "location": null,
+                "job_description": null,
+                "protected_id_image_url": "http://127.0.0.1:8000/api/media/employee/8/id_image/",
+                "protected_profile_photo_url": "http://127.0.0.1:8000/api/media/employee/8/profile_photo/",
+                "bank_name": "SBI",
+                "ifsc_code": "SBIN0001234",
+                "masked_account_number": "******7890",
+                "branch": "Hyderabad",
+                "masked_aadhaar": null,
+                "protected_aadhaar_image_url": "http://127.0.0.1:8000/api/media/employee/8/aadhaar_image/",
+                "masked_pan": null,
+                "protected_pan_image_url": "http://127.0.0.1:8000/api/media/employee/8/pan_image/",
+                "masked_passport": null,
+                "protected_passport_image_url": "http://127.0.0.1:8000/api/media/employee/8/passport_image/",
+                "role": "employee",
+                "created_at": "2025-12-17T14:52:29.007197+05:30",
+                "updated_at": "2025-12-17T14:52:29.007227+05:30"
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-20",
+            "end_date": "2025-12-22",
+            "days": "3.00",
+            "reason": "",
+            "applied_at": "2025-12-17T15:27:11.739416+05:30",
+            "status": "tl_rejected",
+            "tl": 7,
+            "hr": null,
+            "tl_remarks": "",
+            "hr_remarks": null
+        }
+    ]
+}
+
+TL MEMBERS :-
+
+http://127.0.0.1:8000/api/team/members/ :- GET
+
+Response:-
+
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 4,
+            "user": {
+                "id": 4,
+                "username": "sanju.k",
+                "first_name": "sanju",
+                "last_name": "k",
+                "email": "sanju.k@wealthzonegroupai.com",
+                "role": "employee"
+            },
+            "emp_id": "WZG-AI-0004",
+            "first_name": "sanju",
+            "last_name": "k",
+            "work_email": "sanju.k@wealthzonegroupai.com",
+            "job_title": "Python Developer",
+            "department": "IT",
+            "profile_photo": null
+        }
+    ]
+}
+
+TL ATTENDANCES:-
+
+http://127.0.0.1:8000/api/team/attendance/ :- GET
+
+Empty Response:-
+ {
+    "detail": "Authentication credentials were not provided."
+}
+Response:-
+{
+    "count": 0,
+    "next": null,
+    "previous": null,
+    "results": []
+}
+
+TL DASHBOARD:-
+
+http://127.0.0.1:8000/api/team/dashboard/ :- GET
+
+EMPTY RESPONSE :-
+  
+  {
+    "detail": "Authentication credentials were not provided."
+}
+RESPONSE :-
+   
+{
+    "team_count": 1,
+    "pending_leave_requests": 0,
+    "attendance_summary": {
+        "present_days": 0,
+        "total_hours": 0.0
+    },
+    "recent_meetings": []
+}
+
+TL LIST:-
+
+http://127.0.0.1:8000/api/tl/list/ :-GET
+
+EMPTY RESPONSE:-
+{
+    "detail": "Authentication credentials were not provided."
+}
+RESPONSE:-
+
+{
+    "detail": "You do not have permission to perform this action."
+}
+
+TL PENDING:-
+
+http://127.0.0.1:8000/api/leave/pending/ :-
+
+
+
+EMPTY RESPONSE:-
+
+{
+    "detail": "Authentication credentials were not provided."
+}
+Response:-
+{
+    "count": 0,
+    "next": null,
+    "previous": null,
+    "results": []
+}
+Team member to apply the leave 
+Response:-
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 3,
+            "profile": {
+                "user": {
+                    "id": 4,
+                    "username": "sanju.k",
+                    "first_name": "sanju",
+                    "last_name": "k",
+                    "email": "sanju.k@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "emp_id": "WZG-AI-0004",
+                "work_email": "sanju.k@wealthzonegroupai.com",
+                "first_name": "sanju",
+                "middle_name": null,
+                "last_name": "k",
+                "personal_email": "sanju@gmail.com",
+                "phone_number": "9848565654",
+                "alternate_number": null,
+                "dob": "2001-05-01",
+                "blood_group": null,
+                "gender": "male",
+                "marital_status": null,
+                "job_title": "Python Developer",
+                "department": "IT",
+                "team_lead": {
+                    "id": 3,
+                    "username": "venky.k",
+                    "first_name": "venky",
+                    "last_name": "k",
+                    "email": "venky.k@wealthzonegroupai.com",
+                    "display": "venky k"
+                },
+                "team_lead_id": 3,
+                "employment_type": "full_time",
+                "start_date": "2025-11-01",
+                "location": null,
+                "job_description": null,
+                "protected_id_image_url": "http://127.0.0.1:8000/api/media/employee/4/id_image/",
+                "protected_profile_photo_url": "http://127.0.0.1:8000/api/media/employee/4/profile_photo/",
+                "bank_name": "SBI",
+                "ifsc_code": "SBIN0001234",
+                "masked_account_number": "******7890",
+                "branch": "Hyderabad",
+                "masked_aadhaar": null,
+                "protected_aadhaar_image_url": "http://127.0.0.1:8000/api/media/employee/4/aadhaar_image/",
+                "masked_pan": null,
+                "protected_pan_image_url": "http://127.0.0.1:8000/api/media/employee/4/pan_image/",
+                "masked_passport": null,
+                "protected_passport_image_url": "http://127.0.0.1:8000/api/media/employee/4/passport_image/",
+                "role": "employee",
+                "created_at": "2025-12-17T14:40:26.228114+05:30",
+                "updated_at": "2025-12-17T16:29:57.646908+05:30"
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-20",
+            "end_date": "2025-12-21",
+            "days": "2.00",
+            "reason": "",
+            "applied_at": "2025-12-17T16:40:08.494843+05:30",
+            "status": "applied",
+            "tl": 3,
+            "hr": null,
+            "tl_remarks": null,
+            "hr_remarks": null
+        }
+    ]
+}
+
+
+TL Leave Action:-
+
+http://127.0.0.1:8000/api/leave/<int:leave_id>/action/:- post
+
+Empty Response:-
+
+{
+    "detail": "Authentication credentials were not provided."
+}
+
+{
+    "detail": "No LeaveRequest matches the given query."
+} 
+{
+    "detail": "TL rejected leave."
+}
+Draw back :-
+Employee to apply the leave but tl didn’t give any response automatically rejected. 
+In leave action TL didn’t take any action but in the output it showing directly rejected,
+First TL action is rejected but again TL wants to change the action is not working.
+body(row):-
+{
+  "action": "approve",
+  "remarks": "Approved"
+}
+Response:-
+{
+    "detail": "TL approved leave."
+}
+
+
+
+
+ValidationError at /api/leave/3/action/
+["TL action is allowed only when leave status is 'applied'."]
+
+
+
+
+
+TL Calendar Create :-
+
+http://127.0.0.1:8000/api/tl/calendar/create/ :- PUT
+
+EMPTY RESPONSE:-
+ 
+{
+    "detail": "Authentication credentials were not provided."
+}
+
+
+{
+    "detail": "Missing required fields."
+}
+body(raw):-
+{
+  "title": "Company Meeting",
+  "description": "Discuss next quarter",
+  "event_type": "meeting",
+  "date": "2025-12-20",
+  "start_time": "10:00",
+  "end_time": "11:00"
+}
+Response:-
+{
+    "id": 1,
+    "title": "Company Meeting",
+    "description": "Discuss next quarter",
+    "event_type": "meeting",
+    "date": "2025-12-20",
+    "start_time": "10:00",
+    "end_time": "11:00",
+    "created_at": "2025-12-17T15:33:12.688741+05:30",
+    "visible_to_tl_hr": true,
+    "extra": null,
+    "created_by": 3
+}
+Draw backs:-
+Same time and same date also allowed and previous date and time also allowed.
+
+TL Calendar Update:-
+
+http://127.0.0.1:8000/api/tl/calendar/<int:pk>/update/ :- PUT
+
+Empty response:-
+{
+    "detail": "Authentication credentials were not provided."
+}
+{
+    "title": [
+        "This field is required."
+    ],
+    "date": [
+        "This field is required."
+    ]
+}
+Body (row):-
+
+{
+    "title": "Project Meeting",
+    "description": "Discuss next quarter",
+    "event_type": "meeting",
+    "date": "2025-11-20",
+    "start_time": "10:00",
+    "end_time": "11:00",
+    "created_at": "2025-12-17T15:39:32.253278+05:30",
+    "visible_to_tl_hr": true,
+    "extra": null
+}
+
+Response:-
+
+{
+    "id": 1,
+    "title": "Project Meeting",
+    "description": "Discuss next quarter",
+    "event_type": "meeting",
+    "date": "2025-11-20",
+    "start_time": "10:00:00",
+    "end_time": "11:00:00",
+    "created_at": "2025-12-17T15:33:12.688741+05:30",
+    "visible_to_tl_hr": true,
+    "extra": null,
+    "created_by": 3
+
+
+}
+
+
+{
+    "detail": "No CalendarEvent matches the given query."
+}
+
+
+TL Calendar Delete:-
+
+http://127.0.0.1:8000/api/tl/calendar/<int:pk>/delete/ :- DELETE
+
+Empty response :-
+
+ {
+    "detail": "Authentication credentials were not provided."
+}
+
+{
+    "detail": "No CalendarEvent matches the given query."
+}
+
+Tl announcement create:- POST
+
+Empty response:-
+
+{
+    "detail": "Authentication credentials were not provided."
+}
+{
+    "title": [
+        "This field is required."
+    ],
+    "description": [
+        "This field is required."
+    ],
+    "date": [
+        "This field is required."
+    ],
+    "time": [
+        "This field is required."
+    ],
+    "priority": [
+        "This field is required."
+    ]
+}
+Body(row):-
+
+{
+  "title": "Old Meeting",
+  "description": "Test",
+  "date": "2024-01-01",
+  "time": "10:00:00",
+  "department": "EMP",
+  "priority": "HIGH"
+}
+Response:-
+{
+    "success": true,
+    "message": "TL announcement created"
+}
+Draw backs:-
+Same time and same date also allowed and previous date and time also allowed.
+
+Tl announcement update:-
+http://127.0.0.1:8000/api/tl/announcement/<int:pk>/update/ :- PUT
+
+
+Empty response:-
+
+{
+    "detail": "Authentication credentials were not provided."
+}
+Body (row):-
+{
+  "title": "Old Meeting",
+  "description": "meeting",
+  "date": "2024-02-01",
+  "time": "10:00:00",
+  "department": "EMP",
+  "priority": "HIGH"
+}
+
+Response:
+{
+    "success": true,
+    "message": "Announcement updated successfully",
+    "data": {
+        "id": 1,
+        "created_by": 3,
+        "title": "Old Meeting",
+        "description": "meeting",
+        "date": "2024-02-01",
+        "time": "10:00:00",
+        "priority": "HIGH",
+        "created_role": "TL",
+        "show_in_calendar": true
+    }
+}
+Tl announcement update:- put
+
+http://127.0.0.1:8000/api/tl/announcement/<int:pk>/delete/ :-DELETE
+
+Empty response:-
+{
+    "detail": "Authentication credentials were not provided."
+}
+Response:-
+{
+    "success": true,
+    "message": "Announcement deleted successfully"
+}
+
+HR Side Endpoints checking:
+
+POST Method- http://127.0.0.1:8000/api/hr/create-employee/  
+Empty Body in raw
+Response 400 bad request
+Required Fields: 
+{
+    "contact": [
+        "This field is required."
+    ],
+    "job": [
+        "This field is required."
+    ],
+    "bank": [
+        "This field is required."
+    ]
+}
+
+
+GET-Method- http://127.0.0.1:8000/api/hr/employee/WZG-AI-004/sensitive/
+Response: {
+    "hr_access": true,
+    "data": {
+        "user": {
+            "id": 4,
+            "username": "sanju.k",
+            "email": "sanju.k@wealthzonegroupai.com",
+            "role": "employee"
+        },
+        "emp_id": "WZG-AI-0004",
+        "first_name": "sanju",
+        "last_name": "k",
+        "aadhaar_number": null,
+        "pan": null,
+        "passport_number": null,
+        "bank_name": "SBI",
+        "ifsc_code": "SBIN0001234",
+        "account_number": "1234567890",
+        "branch": "Hyderabad"
+    }
+}
+ 
+GET_Method- http://127.0.0.1:8000/api/employees/4/ 
+Response: {
+    "id": 4,
+    "user": {
+        "id": 4,
+        "username": "sanju.k",
+        "first_name": "sanju",
+        "last_name": "k",
+        "email": "sanju.k@wealthzonegroupai.com",
+        "role": "employee"
+    },
+    "emp_id": "WZG-AI-0004",
+    "work_email": "sanju.k@wealthzonegroupai.com",
+    "username": null,
+    "first_name": "sanju",
+    "last_name": "k",
+    "middle_name": null,
+    "personal_email": "sanju@gmail.com",
+    "phone_number": "9848565654",
+    "alternate_number": null,
+    "dob": "2001-05-01",
+    "blood_group": null,
+    "gender": "male",
+    "marital_status": null,
+    "profile_photo": null,
+    "aadhaar_number": null,
+    "aadhaar_image": null,
+    "pan": null,
+    "pan_image": null,
+    "passport_number": null,
+    "passport_image": null,
+    "id_card_number": null,
+    "id_card_image": null,
+    "job_title": "Python Developer",
+    "department": "IT",
+    "employment_type": "full_time",
+    "start_date": "2025-11-01",
+    "location": null,
+    "job_description": null,
+    "id_image": null,
+    "bank_name": "SBI",
+    "account_number": "1234567890",
+    "ifsc_code": "SBIN0001234",
+    "branch": "Hyderabad",
+    "role": "employee",
+    "is_active": true,
+    "created_at": "2025-12-17T14:40:26.228114+05:30",
+    "updated_at": "2025-12-17T14:40:26.228143+05:30",
+    "team_lead": 3
+}
+
+
+PUT-Method-  http://127.0.0.1:8000/api/employees/4/job&bank/
+Response: {
+    "job_title": "Python Developer",
+    "department": "IT",
+    "team_lead": 3,
+    "employment_type": "full_time",
+    "start_date": "2025-11-01",
+    "location": null,
+    "job_description": null,
+    "bank_name": "SBI",
+    "account_number": "1234567890",
+    "ifsc_code": "SBIN0001234",
+    "branch": "Hyderabad"
+}
+
+
+GET-Method- http://127.0.0.1:8000/api/attendance  
+Response: {
+    "count": 3,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "user": {
+                "id": 5,
+                "username": "srinath.k",
+                "first_name": "srinath",
+                "last_name": "k",
+                "email": "srinath.k@wealthzonegroupai.com",
+                "role": "employee"
+            },
+            "date": "2025-12-17",
+            "clock_in": "2025-12-17T15:13:35.504505+05:30",
+            "clock_out": "2025-12-17T15:15:07.779344+05:30",
+            "duration_time": "00:01:32",
+            "duration_seconds": 92,
+            "status": "absent",
+            "reminder_count": 0,
+            "last_reminder_at": null,
+            "created_at": "2025-12-17T15:13:35.505951+05:30",
+            "updated_at": "2025-12-17T15:15:07.779840+05:30"
+        },
+        {
+            "id": 2,
+            "user": {
+                "id": 6,
+                "username": "pavithra.b",
+                "first_name": "pavithra",
+                "last_name": "b",
+                "email": "pavithra.b@wealthzonegroupai.com",
+                "role": "employee"
+            },
+            "date": "2025-12-17",
+            "clock_in": "2025-12-17T15:32:19.977790+05:30",
+            "clock_out": "2025-12-17T15:38:39.981732+05:30",
+            "duration_time": "00:06:20",
+            "duration_seconds": 380,
+            "status": "absent",
+            "reminder_count": 0,
+            "last_reminder_at": null,
+            "created_at": "2025-12-17T15:32:19.978640+05:30",
+            "updated_at": "2025-12-17T15:38:39.981858+05:30"
+        },
+        {
+            "id": 3,
+            "user": {
+                "id": 7,
+                "username": "mohan.g",
+                "first_name": "mohan",
+                "last_name": "g",
+                "email": "mohan.g@wealthzonegroupai.com",
+                "role": "tl"
+            },
+            "date": "2025-12-17",
+            "clock_in": "2025-12-17T16:33:24.047408+05:30",
+            "clock_out": null,
+            "duration_time": null,
+            "duration_seconds": null,
+            "status": "working",
+            "reminder_count": 0,
+            "last_reminder_at": null,
+            "created_at": "2025-12-17T16:33:24.061366+05:30",
+            "updated_at": "2025-12-17T16:33:24.061390+05:30"
+        }
+    ]
+}
+
+
+GET-Method- http://127.0.0.1:8000/api/attendance/3
+Response: {
+    "id": 3,
+    "user": {
+        "id": 7,
+        "username": "mohan.g",
+        "first_name": "mohan",
+        "last_name": "g",
+        "email": "mohan.g@wealthzonegroupai.com",
+        "role": "tl"
+    },
+    "date": "2025-12-17",
+    "clock_in": "2025-12-17T16:33:24.047408+05:30",
+    "clock_out": null,
+    "duration_time": null,
+    "duration_seconds": null,
+    "status": "working",
+    "reminder_count": 0,
+    "last_reminder_at": null,
+    "created_at": "2025-12-17T16:33:24.061366+05:30",
+    "updated_at": "2025-12-17T16:33:24.061390+05:30"
+}
+
+
+POST-Method- http://127.0.0.1:8000/api/calendar/create/
+Response: 400 Bad Request
+{
+    "title": [
+        "This field is required."
+    ],
+    "date": [
+        "This field is required."
+    ]
+}
+
+Response: 201OK
+{
+    "id": 10,
+    "title": "New Policy",
+    "description": null,
+    "event_type": "announcement",
+    "date": "2025-12-17",
+    "start_time": null,
+    "end_time": null,
+    "created_at": "2025-12-17T17:19:51.606876+05:30",
+    "visible_to_tl_hr": true,
+    "extra": null,
+    "created_by": 1
+}
+
+
+PUT-Method-  http://127.0.0.1:8000/api/calendar/9/update/
+Empty Body Response:
+{
+    "title": [
+        "This field is required."
+    ],
+    "date": [
+        "This field is required."
+    ]
+}
+
+Response:
+{
+    "id": 10,
+    "title": "Meeting",
+    "description": null,
+    "event_type": "announcement",
+    "date": "2025-12-18",
+    "start_time": null,
+    "end_time": null,
+    "created_at": "2025-12-17T17:19:51.606876+05:30",
+    "visible_to_tl_hr": true,
+    "extra": null,
+    "created_by": 1
+}
+
+DELETE-Method- http://127.0.0.1:8000/api/calendar/9/delete/
+Response: Successfully deleted
+
+GET-Method- http://127.0.0.1:8000/api/leaves/
+Response: {
+    "count": 5,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 5,
+            "profile": {
+                "id": 2,
+                "emp_id": "WZG-AI-0002",
+                "user": {
+                    "id": 2,
+                    "username": "manogna.d",
+                    "first_name": "manogna",
+                    "last_name": "d",
+                    "email": "manogna.d@wealthzonegroupai.com",
+                    "role": "tl"
+                },
+                "first_name": "manogna",
+                "last_name": "d",
+                "work_email": "manogna.d@wealthzonegroupai.com",
+                "job_title": "Python Developer",
+                "department": "IT",
+                "role": "tl",
+                "start_date": "2025-08-01",
+                "location": null,
+                "profile_photo": null
+            },
+            "leave_type": "Casual Leave",
+            "start_date": "2025-12-18",
+            "end_date": "2025-12-20",
+            "days": "3.00",
+            "reason": "Personal work",
+            "applied_at": "2025-12-17T17:21:02.899733+05:30",
+            "status": "pending_hr",
+            "tl_remarks": null,
+            "hr_remarks": null,
+            "last_action_at": null,
+            "tl": null,
+            "hr": null,
+            "last_action_by": null
+        },
+        {
+            "id": 4,
+            "profile": {
+                "id": 4,
+                "emp_id": "WZG-AI-0004",
+                "user": {
+                    "id": 4,
+                    "username": "sanju.k",
+                    "first_name": "sanju",
+                    "last_name": "k",
+                    "email": "sanju.k@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "first_name": "sanju",
+                "last_name": "k",
+                "work_email": "sanju.k@wealthzonegroupai.com",
+                "job_title": "Python Developer",
+                "department": "IT",
+                "role": "employee",
+                "start_date": "2025-11-01",
+                "location": null,
+                "profile_photo": null
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-22",
+            "end_date": "2025-12-23",
+            "days": "2.00",
+            "reason": "",
+            "applied_at": "2025-12-17T17:02:05.790187+05:30",
+            "status": "hr_rejected",
+            "tl_remarks": "Approved",
+            "hr_remarks": "",
+            "last_action_at": "2025-12-17T17:09:15.612864+05:30",
+            "tl": 3,
+            "hr": 1,
+            "last_action_by": 1
+        },
+        {
+            "id": 3,
+            "profile": {
+                "id": 4,
+                "emp_id": "WZG-AI-0004",
+                "user": {
+                    "id": 4,
+                    "username": "sanju.k",
+                    "first_name": "sanju",
+                    "last_name": "k",
+                    "email": "sanju.k@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "first_name": "sanju",
+                "last_name": "k",
+                "work_email": "sanju.k@wealthzonegroupai.com",
+                "job_title": "Python Developer",
+                "department": "IT",
+                "role": "employee",
+                "start_date": "2025-11-01",
+                "location": null,
+                "profile_photo": null
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-20",
+            "end_date": "2025-12-21",
+            "days": "2.00",
+            "reason": "",
+            "applied_at": "2025-12-17T16:40:08.494843+05:30",
+            "status": "tl_rejected",
+            "tl_remarks": "",
+            "hr_remarks": null,
+            "last_action_at": "2025-12-17T16:51:06.820066+05:30",
+            "tl": 3,
+            "hr": null,
+            "last_action_by": 3
+        },
+        {
+            "id": 2,
+            "profile": {
+                "id": 5,
+                "emp_id": "WZG-AI-0005",
+                "user": {
+                    "id": 5,
+                    "username": "srinath.k",
+                    "first_name": "srinath",
+                    "last_name": "k",
+                    "email": "srinath.k@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "first_name": "srinath",
+                "last_name": "k",
+                "work_email": "srinath.k@wealthzonegroupai.com",
+                "job_title": "Python Developer",
+                "department": "IT",
+                "role": "employee",
+                "start_date": "2025-11-01",
+                "location": null,
+                "profile_photo": null
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-18",
+            "end_date": "2025-12-20",
+            "days": "3.00",
+            "reason": "motions",
+            "applied_at": "2025-12-17T16:37:47.918953+05:30",
+            "status": "hr_rejected",
+            "tl_remarks": null,
+            "hr_remarks": "",
+            "last_action_at": "2025-12-17T17:15:26.173380+05:30",
+            "tl": null,
+            "hr": 1,
+            "last_action_by": 1
+        },
+        {
+            "id": 1,
+            "profile": {
+                "id": 8,
+                "emp_id": "WZG-AI-0008",
+                "user": {
+                    "id": 8,
+                    "username": "haritha.a",
+                    "first_name": "haritha",
+                    "last_name": "a",
+                    "email": "haritha.a@wealthzonegroupai.com",
+                    "role": "employee"
+                },
+                "first_name": "haritha",
+                "last_name": "a",
+                "work_email": "haritha.a@wealthzonegroupai.com",
+                "job_title": "Python Developer",
+                "department": "IT",
+                "role": "employee",
+                "start_date": "2025-12-01",
+                "location": null,
+                "profile_photo": null
+            },
+            "leave_type": "Sick Leave",
+            "start_date": "2025-12-20",
+            "end_date": "2025-12-22",
+            "days": "3.00",
+            "reason": "",
+            "applied_at": "2025-12-17T15:27:11.739416+05:30",
+            "status": "tl_rejected",
+            "tl_remarks": "",
+            "hr_remarks": null,
+            "last_action_at": "2025-12-17T15:53:56.720389+05:30",
+            "tl": 7,
+            "hr": null,
+            "last_action_by": 7
+        }
+    ]
+}
+
+Note: If tl can apply for leave is directly to hr can get request for action
+
+
+GET-Method- http://127.0.0.1:8000/api/leaves/5/
+Response: {
+    "id": 5,
+    "profile": {
+        "id": 2,
+        "emp_id": "WZG-AI-0002",
+        "user": {
+            "id": 2,
+            "username": "manogna.d",
+            "first_name": "manogna",
+            "last_name": "d",
+            "email": "manogna.d@wealthzonegroupai.com",
+            "role": "tl"
+        },
+        "first_name": "manogna",
+        "last_name": "d",
+        "work_email": "manogna.d@wealthzonegroupai.com",
+        "job_title": "Python Developer",
+        "department": "IT",
+        "role": "tl",
+        "start_date": "2025-08-01",
+        "location": null,
+        "profile_photo": null
+    },
+    "leave_type": "Casual Leave",
+    "start_date": "2025-12-18",
+    "end_date": "2025-12-20",
+    "days": "3.00",
+    "reason": "Personal work",
+    "applied_at": "2025-12-17T17:21:02.899733+05:30",
+    "status": "pending_hr",
+    "tl_remarks": null,
+    "hr_remarks": null,
+    "last_action_at": null,
+    "tl": null,
+    "hr": null,
+    "last_action_by": null
+}
+
+
+
+POST-Method- http://127.0.0.1:8000/api/leaves/2/action/
+Empty body- not showing required fields and directly rejected by hr 
+Response: {
+    "detail": "Leave rejected by HR"
+}
+
+
+
+
+
+
+
+
+
+
+
+

@@ -16,9 +16,10 @@ from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
 from . import models
-from .serializers import AnnouncementSerializer, TLAnnouncementSerializer
+from .serializers import AnnouncementSerializer, TLAnnouncementSerializer, MySalaryDetailSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
+from django.db import IntegrityError
 
 
 User = get_user_model()
@@ -128,19 +129,28 @@ class HRCalendarDeleteAPIView(generics.DestroyAPIView):
 def create_announcement(request):
     serializer = AnnouncementSerializer(data=request.data)
     if serializer.is_valid():
-        announcement = serializer.save(created_by=request.user)
+        try:
+            announcement = serializer.save(created_by=request.user)
 
-        if announcement.show_in_calendar:
-            CalendarEvent.objects.create(
-                title=announcement.title,
-                description=announcement.description,
-                event_type="announcement",
-                date=announcement.date,
-                start_time=announcement.time,
-                created_by=request.user,
-                extra={"announcement_id": announcement.id, "source": "HR"}
+            if announcement.show_in_calendar:
+                CalendarEvent.objects.create(
+                    title=announcement.title,
+                    description=announcement.description,
+                    event_type="announcement",
+                    date=announcement.date,
+                    start_time=announcement.time,
+                    created_by=request.user,
+                    extra={"announcement_id": announcement.id, "source": "HR"}
+                )
+            return Response({"success": True, "message": "Announcement created successfully"})
+
+        except IntegrityError:
+            return Response(
+                {"success": False,
+                    "errors": "An announcement already exists at this date and time."},
+                status=400
             )
-        return Response({"success": True, "message": "created"})
+
     return Response(serializer.errors, status=400)
 
 
@@ -290,63 +300,116 @@ class EmployeeSalaryAssignAPIView(APIView):
         return Response(serializers.EmployeeSalaryAdminSerializer(es).data)
 
 
+class MyPayrollDetailsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        salary = (
+            EmployeeSalary.objects
+            .filter(profile__user=user, is_active=True)
+            .order_by("-effective_from")
+            .first()
+        )
+
+        if not salary:
+            return Response({"salary": None}, status=200)
+
+        serializer = MySalaryDetailSerializer(salary)
+        return Response({"salary": serializer.data}, status=200)
+
+
 class HRGeneratePayslipAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
 
     def post(self, request, profile_id):
-
         profile = get_object_or_404(EmployeeProfile, id=profile_id)
-        year = int(request.data.get('year', timezone.localdate().year))
-        month = int(request.data.get('month', timezone.localdate().month))
-        force = bool(request.data.get('force', False))
 
-        try:
-            es = profile.salary
-        except EmployeeSalary.DoesNotExist:
-            return Response({"detail": "No salary assigned"}, status=400)
+        year = int(request.data.get('year'))
+        month = int(request.data.get('month'))
 
+        es = profile.salary
+        structure = es.structure
+
+        # --- Working days (Mon–Fri) ---
         cal = calendar.Calendar()
-        working_days = sum(1 for d in cal.itermonthdays2(
-            year, month) if d[0] != 0 and d[1] < 5)
+        working_days = sum(
+            1 for d in cal.itermonthdays2(year, month)
+            if d[0] != 0 and d[1] < 5
+        )
 
-        attend_qs = Attendance.objects.filter(
-            user=profile.user, date__year=year, date__month=month, status='completed')
-        days_present = attend_qs.count()
-        total_seconds = attend_qs.aggregate(
-            total=Sum('duration_time'))['total'] or 0
-        overtime_seconds = attend_qs.aggregate(
-            total=Sum('overtime_seconds'))['total'] or 0
+        attendances = Attendance.objects.filter(
+            user=profile.user,
+            date__year=year,
+            date__month=month,
+            status='completed'
+        )
 
-        gross = float(es.structure.monthly_ctc)
-        prorata = gross * \
-            (days_present / working_days) if working_days else 0.0
+        days_present = attendances.count()
+        absent_days = working_days - days_present
 
-        hourly_rate = es.hourly_rate(working_days_in_month=working_days)
-        overtime_amt = (overtime_seconds / 3600.0) * \
-            hourly_rate * float(es.structure.overtime_multiplier)
+        # --- Salary breakup ---
+        monthly_gross = float(structure.monthly_ctc)
 
-        deductions = float(request.data.get('deductions', 0.0))
-        net = prorata + overtime_amt - deductions
+        prorata_gross = (
+            monthly_gross * (days_present / working_days)
+            if working_days else 0
+        )
 
-        payslip, created = Payslip.objects.update_or_create(
-            profile=profile, year=year, month=month,
+        basic = structure.basic_amount()
+        hra = structure.hra_amount()
+        pf = structure.pf_amount()
+
+        professional_tax = 200
+        insurance = float(request.data.get('insurance', 0))
+        esi = float(request.data.get('esi', 0))
+
+        # --- Overtime ---
+        overtime_seconds = attendances.aggregate(
+            total=Sum('overtime_seconds')
+        )['total'] or 0
+
+        hourly_rate = es.hourly_rate(working_days)
+        overtime_amount = (
+            (overtime_seconds / 3600) *
+            hourly_rate *
+            float(structure.overtime_multiplier)
+        )
+
+        total_deductions = pf + professional_tax + insurance + esi
+        net_amount = prorata_gross + overtime_amount - total_deductions
+
+        payslip, _ = Payslip.objects.update_or_create(
+            profile=profile,
+            year=year,
+            month=month,
             defaults={
                 'working_days': working_days,
                 'days_present': days_present,
-                'gross_amount': round(prorata, 2),
-                'overtime_amount': round(overtime_amt, 2),
-                'deductions': round(deductions, 2),
-                'net_amount': round(net, 2),
+                'gross_amount': round(prorata_gross, 2),
+                'overtime_amount': round(overtime_amount, 2),
+                'deductions': round(total_deductions, 2),
+                'net_amount': round(net_amount, 2),
                 'details': {
-                    'monthly_ctc': es.structure.monthly_ctc,
-                    'prorata': round(prorata, 2),
-                    'overtime_amt': round(overtime_amt, 2),
-                    'deductions': round(deductions, 2)
+                    'monthly_ctc': monthly_gross,
+                    'basic': round(float(basic), 2),
+                    'hra': round(float(hra), 2),
+                    'pf': round(float(pf), 2),
+                    'professional_tax': professional_tax,
+                    'insurance': insurance,
+                    'esi': esi,
+                    'absent_days': absent_days,
+                    'overtime_amount': round(overtime_amount, 2)
                 },
                 'generated_by': request.user
             }
         )
-        return Response(serializers.PayslipAdminSerializer(payslip).data, status=201 if created else 200)
+
+        return Response(
+            serializers.PayslipAdminSerializer(payslip).data,
+            status=201
+        )
 
 
 class HRLeaveListAPIView(generics.ListAPIView):
