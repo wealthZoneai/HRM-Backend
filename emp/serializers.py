@@ -467,6 +467,39 @@ class EmployeeIdentificationSerializer(serializers.ModelSerializer):
     HR / Management can update anytime.
     """
 
+    def validate_aadhaar_number(self, value):
+        if not value:
+            return value  # allow blank / optional
+
+        value = value.replace(" ", "")
+        if not re.fullmatch(r"\d{12}", value):
+            raise serializers.ValidationError(
+                "Aadhaar number must be exactly 12 digits."
+            )
+        return value
+
+    def validate_pan(self, value):
+        if not value:
+            return value  # allow blank / optional
+
+        value = value.replace(" ", "").upper()
+        if not re.fullmatch(r"[A-Z]{5}[0-9]{4}[A-Z]{1}", value):
+            raise serializers.ValidationError(
+                "PAN must be in format ABCDE1234F (uppercase)."
+            )
+        return value
+
+    def validate_passport_number(self, value):
+        if not value:
+            return value
+
+        value = value.replace(" ", "").upper()
+        if not re.fullmatch(r"[A-Z][0-9]{7}", value):
+            raise serializers.ValidationError(
+                "Passport number must be 1 uppercase letter followed by 7 digits (e.g. A1234567)."
+            )
+        return value
+
     class Meta:
         model = EmployeeProfile
         fields = (

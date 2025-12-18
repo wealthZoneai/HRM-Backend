@@ -40,7 +40,7 @@ class EmployeeProfile(models.Model):
         validators=[validate_file_size, validate_image_extension]
     )
 
-    aadhaar_number = models.CharField(max_length=20, null=True, blank=True)
+    aadhaar_number = models.CharField(max_length=14, null=True, blank=True)
     aadhaar_front_image = models.ImageField(
         upload_to='ids/aadhaar/',
         null=True,
