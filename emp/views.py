@@ -965,11 +965,14 @@ class TimesheetDailyUpdateAPIView(APIView):
         saved = []
         for e in entries:
             # ✅ Use local timezone correctly (NO double make_aware)
-            start_dt = timezone.localtime(
-                timezone.datetime.combine(date, e["start_time"])
+            start_dt = timezone.make_aware(
+                datetime.combine(date, e["start_time"]),
+                timezone.get_current_timezone()
             )
-            end_dt = timezone.localtime(
-                timezone.datetime.combine(date, e["end_time"])
+
+            end_dt = timezone.make_aware(
+                datetime.combine(date, e["end_time"]),
+                timezone.get_current_timezone()
             )
 
             saved.append(
