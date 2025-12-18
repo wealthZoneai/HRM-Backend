@@ -41,30 +41,15 @@ class IsTLorHRorOwner(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if not user or not user.is_authenticated:
-            return False
 
-        if getattr(user, "role", None) in ("hr", "management"):
+        if user.role in ("hr", "management"):
             return True
 
-        profile = self._get_profile_from_obj(obj)
+        if hasattr(obj, "profile") and obj.profile.user == user:
+            return True
 
-        try:
-            if profile and getattr(profile, "user", None) == user:
-                return True
-        except Exception:
-            pass
-
-        if getattr(user, "role", None) == "tl":
-            try:
-                employee_user = getattr(profile, "user", None)
-                if not employee_user:
-                    return False
-                team_lead = getattr(
-                    employee_user.employeeprofile, "team_lead", None)
-                return team_lead == user
-            except Exception:
-                return False
+        if user.role == "tl" and hasattr(obj, "tl"):
+            return obj.tl == user
 
         return False
 

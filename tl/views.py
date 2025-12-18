@@ -46,8 +46,18 @@ class TLApproveRejectLeaveAPIView(APIView):
     def post(self, request, leave_id):
         leave = get_object_or_404(LeaveRequest, id=leave_id)
 
+        # If leave does not require TL approval
+        if leave.tl is None:
+            return Response(
+                {"detail": "This leave does not require TL approval."},
+                status=400
+            )
+
         if leave.tl != request.user:
-            return Response({"detail": "Not your team member"}, status=403)
+            return Response(
+                {"detail": "Not your team member"},
+                status=403
+            )
 
         action = request.data.get("action")
         remarks = request.data.get("remarks", "")

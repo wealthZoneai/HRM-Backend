@@ -274,11 +274,11 @@ class Attendance(models.Model):
             self.status = 'working'
 
     def worked_duration(self):
-        if not self.check_in:
+        if not self.clock_in:
             return timedelta(0)
 
         end_time = self.clock_out or timezone.now()
-        return end_time - self.check_in
+        return end_time - self.clock_in
 
     def needs_clockout_reminder(self):
         return (

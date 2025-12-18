@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
-from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance, Notification
+from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveBalance, Notification
 from . import serializers
 from .permissions import IsHR, IsTL
 from django.db.models import Sum, Count
@@ -463,9 +463,7 @@ class HRLeaveActionAPIView(APIView):
 
                 try:
                     lb = LeaveBalance.objects.get(
-                        profile=lr.profile,
-                        leave_type__name__iexact=lr.leave_type
-                    )
+                        profile=lr.profile, leave_type=lr.leave_type)
                     lb.used += lr.days
                     lb.save()
                 except LeaveBalance.DoesNotExist:

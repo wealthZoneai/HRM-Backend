@@ -582,10 +582,10 @@ class LeaveApplyAPIView(APIView):
 
         if route_direct_to_hr:
             tl_user = None
-            initial_status = 'pending_hr'
+            initial_status = 'tl_approved'
         else:
             tl_user = actionable_tl
-            initial_status = 'applied'
+            initial_status = "applied" if prof.team_lead else "tl_approved"
 
         lr = models.LeaveRequest.objects.create(
             profile=prof,
@@ -598,6 +598,20 @@ class LeaveApplyAPIView(APIView):
             tl=tl_user,
         )
 
+        hr_users = User.objects.filter(
+            role__in=["hr", "management"], is_active=True)
+
+        Notification.objects.bulk_create([
+            Notification(
+                to_user=hr_user,
+                title="New Leave Request",
+                body=f"{prof.full_name()} applied for leave",
+                notif_type="leave",
+                extra={"leave_id": lr.id}
+            )
+            for hr_user in hr_users
+        ])
+
         if not route_direct_to_hr and actionable_tl:
             models.Notification.objects.create(
                 to_user=actionable_tl,
@@ -607,20 +621,6 @@ class LeaveApplyAPIView(APIView):
                 notif_type='leave',
                 extra={'leave_request_id': lr.id}
             )
-        else:
-
-            hr_users = User.objects.filter(
-                role__in=['hr', 'management'], is_active=True)
-            for hr_user in hr_users:
-                models.Notification.objects.create(
-                    to_user=hr_user,
-                    title=f"Leave request pending HR: {prof.full_name()}",
-                    body=f"{prof.full_name()} applied for {lr.leave_type} "
-                    f"from {lr.start_date} to {lr.end_date}. Please review.",
-                    notif_type='leave',
-                    extra={'leave_request_id': lr.id}
-                )
-
         return Response({
             "id": lr.id,
             "name": prof.full_name(),
@@ -763,13 +763,13 @@ class HRTLActionAPIView(APIView):
                     status=403
                 )
 
-            if lr.profile.team_lead != user:
+            if lr.tl != user:
                 return Response(
                     {"detail": "You are not authorized to act on this leave."},
                     status=403
                 )
 
-            if lr.status != "applied":
+            if lr.tl is not None and lr.status != "tl_approved":
                 return Response(
                     {
                         "detail": 'TL can only act on leave requests with status "applied".',
