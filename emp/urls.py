@@ -77,7 +77,7 @@ urlpatterns = [
          name='timesheet_daily_form'),
 
     path('timesheet/hr/daily/',
-         views.TimesheetDailyForHRAPIView.as_view(),   name='timesheet_hr_daily'),
+         views.TimesheetDailyForHRAPIView.as_view(), name='timesheet_hr_daily'),
 
     path('timesheet/hr/monthly/',
          views.TimesheetMonthlyForHRAPIView.as_view(), name='timesheet_hr_monthly'),
@@ -86,17 +86,24 @@ urlpatterns = [
          views.TimesheetWorksheetForHRAPIView.as_view(), name='timesheet_hr_worksheet'),
 
     path('timesheet/hr/yearly/',
-         views.TimesheetYearlyForHRAPIView.as_view(),  name='timesheet_hr_yearly'),
+         views.TimesheetYearlyForHRAPIView.as_view(), name='timesheet_hr_yearly'),
 
     path('timesheet/tl/daily/',
-         views.TimesheetDailyForTLAPIView.as_view(),    name='timesheet_tl_daily'),
+         views.TimesheetDailyForTLAPIView.as_view(), name='timesheet_tl_daily'),
 
     path('timesheet/tl/monthly/',
-         views.TimesheetMonthlyForTLAPIView.as_view(),  name='timesheet_tl_monthly'),
+         views.TimesheetMonthlyForTLAPIView.as_view(), name='timesheet_tl_monthly'),
 
     path('timesheet/tl/worksheet/',
          views.TimesheetWorksheetForTLAPIView.as_view(), name='timesheet_tl_worksheet'),
 
     path('timesheet/tl/yearly/',
-         views.TimesheetYearlyForTLAPIView.as_view(),   name='timesheet_tl_yearly'),
+         views.TimesheetYearlyForTLAPIView.as_view(), name='timesheet_tl_yearly'),
+]
+
+urlpatterns += [
+    path(
+        "documents/<str:emp_id>/<str:doc_field>/", views.ProtectedEmployeeDocumentView.as_view(),
+        name="protected_employee_document",
+    ),
 ]

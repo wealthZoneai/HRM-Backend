@@ -33,6 +33,9 @@ from hr.serializers import AnnouncementSerializer
 from datetime import datetime
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import FileResponse, Http404
+from django.contrib.auth.decorators import login_required
+import mimetypes
 
 
 User = get_user_model()
@@ -80,6 +83,55 @@ class MyProfileView(APIView):
     def get(self, request):
         prof = request.user.employeeprofile
         return Response(serializers.EmployeeProfileReadSerializer(prof).data)
+
+
+class ProtectedEmployeeDocumentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, emp_id, doc_field):
+        """
+        emp_id     -> EmployeeProfile.emp_id
+        doc_field  -> model field name (aadhaar_front_image, pan_back_image, etc)
+        """
+
+        try:
+            profile = EmployeeProfile.objects.get(emp_id=emp_id)
+        except EmployeeProfile.DoesNotExist:
+            raise Http404("Employee not found")
+
+        # --- ACCESS CONTROL ---
+        user = request.user
+        if user.role not in ("hr", "management") and profile.user != user:
+            raise Http404("Not allowed")
+
+        # --- VALID FIELDS (whitelist) ---
+        allowed_fields = {
+            "aadhaar_front_image",
+            "aadhaar_back_image",
+            "pan_front_image",
+            "pan_back_image",
+            "passport_front_image",
+            "passport_back_image",
+        }
+
+        if doc_field not in allowed_fields:
+            raise Http404("Invalid document")
+
+        file = getattr(profile, doc_field, None)
+        if not file:
+            raise Http404("File not found")
+
+        content_type, _ = mimetypes.guess_type(file.path)
+
+        response = FileResponse(
+            open(file.path, "rb"),
+            content_type=content_type or "application/octet-stream"
+        )
+
+        # ✅ FORCE INLINE VIEW (not download)
+        response["Content-Disposition"] = f'inline; filename="{file.name}"'
+
+        return response
 
 
 class UpdateContactView(APIView):
@@ -650,7 +702,8 @@ class MySensitiveDetailsAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = serializers.EmployeeSensitiveSelfSerializer(profile)
+        serializer = serializers.EmployeeSensitiveSelfSerializer(
+            profile, context={"request": request})
         return Response({
             "temporary": True,
             "data": serializer.data
@@ -666,7 +719,8 @@ class HREmployeeSensitiveDetailsAPIView(APIView):
     def get(self, request, emp_id):
         profile = get_object_or_404(EmployeeProfile, emp_id=emp_id)
 
-        serializer = serializers.EmployeeSensitiveHRSerializer(profile)
+        serializer = serializers.EmployeeSensitiveHRSerializer(
+            profile, context={"request": request})
         return Response({
             "hr_access": True,
             "data": serializer.data
@@ -677,97 +731,143 @@ class HRTLActionAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
     def post(self, request, leave_id):
-        action = request.data.get('action')
-        remarks = request.data.get('remarks', '')
+        action = request.data.get("action", "").strip()
+        remarks = request.data.get("remarks", "").strip()
+
         lr = get_object_or_404(models.LeaveRequest, id=leave_id)
         user = request.user
 
-        if user.role == 'tl':
+        if not action:
+            return Response(
+                {
+                    "detail": "Action is required. Allowed values: approve or reject.",
+                    "current_status": lr.status
+                },
+                status=400
+            )
+
+        if action not in ("approve", "reject"):
+            return Response(
+                {
+                    "detail": "Invalid action. Allowed values: approve or reject.",
+                    "current_status": lr.status
+                },
+                status=400
+            )
+
+        if user.role == "tl":
 
             if lr.profile.user == user:
                 return Response(
-                    {'detail': 'TL cannot approve their own leave.'},
+                    {"detail": "TL cannot approve or reject their own leave."},
                     status=403
                 )
 
-            if lr.status != 'applied':
+            if lr.profile.team_lead != user:
                 return Response(
-                    {'detail': 'TL can only act on requests with status "applied".'},
+                    {"detail": "You are not authorized to act on this leave."},
+                    status=403
+                )
+
+            if lr.status != "applied":
+                return Response(
+                    {
+                        "detail": 'TL can only act on leave requests with status "applied".',
+                        "current_status": lr.status
+                    },
                     status=400
                 )
 
-            if lr.profile.team_lead != user:
-                return Response({'detail': 'Forbidden'}, status=403)
-
-            if action == 'approve':
+            if action == "approve":
                 lr.apply_tl_approval(user, approve=True, remarks=remarks)
 
-                for hr_user in User.objects.filter(role__in=['hr', 'management']):
+                # Notify HR
+                for hr_user in User.objects.filter(role__in=["hr", "management"]):
                     models.Notification.objects.create(
                         to_user=hr_user,
                         title=f"TL approved leave: {lr.profile.full_name()}",
-                        body=f"Leave {lr.id} needs HR action.",
-                        notif_type='leave',
-                        extra={'leave_request_id': lr.id}
+                        body=f"Leave request {lr.id} is awaiting HR action.",
+                        notif_type="leave",
+                        extra={"leave_request_id": lr.id}
                     )
 
-                return Response({'detail': 'tl_approved'})
+                return Response(
+                    {
+                        "detail": "Leave approved by TL.",
+                        "status": "tl_approved"
+                    },
+                    status=200
+                )
 
-            elif action == 'reject':
+            if action == "reject":
                 lr.apply_tl_approval(user, approve=False, remarks=remarks)
 
                 models.Notification.objects.create(
                     to_user=lr.profile.user,
-                    title='Leave rejected by TL',
-                    body=remarks or 'Your leave was rejected by TL',
-                    notif_type='leave',
-                    extra={'leave_request_id': lr.id}
+                    title="Leave rejected by TL",
+                    body=remarks or "Your leave request was rejected by your Team Lead.",
+                    notif_type="leave",
+                    extra={"leave_request_id": lr.id}
                 )
 
-                return Response({'detail': 'tl_rejected'})
-
-            return Response({'detail': 'Invalid action'}, status=400)
-
-        if user.role in ('hr', 'management'):
-
-            if lr.status == 'tl_rejected':
                 return Response(
-                    {'detail': 'HR cannot take action because TL rejected this leave.'},
+                    {
+                        "detail": "Leave rejected by TL.",
+                        "status": "tl_rejected"
+                    },
+                    status=200
+                )
+
+        if user.role in ("hr", "management"):
+
+            # HR MUST WAIT FOR TL APPROVAL
+            if lr.status != "tl_approved":
+                return Response(
+                    {
+                        "detail": "HR cannot act until TL approves the leave.",
+                        "current_status": lr.status
+                    },
                     status=403
                 )
 
-            if lr.status not in ('tl_approved', 'pending_hr'):
-                return Response(
-                    {'detail': 'HR cannot take action at this stage.'},
-                    status=403
-                )
-
-            if action not in ('approve', 'reject'):
-                return Response({'detail': 'Invalid action'}, status=400)
-
-            if action == 'approve':
+            if action == "approve":
                 try:
                     lr.apply_hr_approval(user, approve=True, remarks=remarks)
                 except DjangoValidationError as e:
                     return Response(
-                        {'detail': e.messages},
-                        status=403
+                        {"detail": e.messages},
+                        status=400
                     )
 
-                return Response({'detail': 'hr_approved'})
+                return Response(
+                    {
+                        "detail": "Leave approved by HR.",
+                        "status": "hr_approved"
+                    },
+                    status=200
+                )
 
-            if action == 'reject':
+            if action == "reject":
                 try:
                     lr.apply_hr_approval(user, approve=False, remarks=remarks)
                 except DjangoValidationError as e:
                     return Response(
-                        {'detail': e.messages},
-                        status=403
+                        {"detail": e.messages},
+                        status=400
                     )
 
-                return Response({'detail': 'hr_rejected'})
+                return Response(
+                    {
+                        "detail": "Leave rejected by HR.",
+                        "status": "hr_rejected"
+                    },
+                    status=200
+                )
 
-        return Response({'detail': 'Not allowed'}, status=403)
+        return Response(
+            {"detail": "You are not allowed to perform this action."},
+            status=403
+        )
 
 
 class TimesheetDailyFormAPIView(APIView):

@@ -1,4 +1,5 @@
 # emp/serializers.py
+from urllib3 import request
 from .models import TimesheetEntry, TimesheetDay, Attendance
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -95,7 +96,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
 
     contact = ContactSerializer(required=True)
     job = JobSerializer(required=True)
-    bank = BankSerializer(required=True)
+    bank = BankSerializer(required=False)
     identification = IdentificationSerializer(required=False)
 
     def validate_work_email(self, value):
@@ -179,9 +180,11 @@ class EmployeeCreateSerializer(serializers.Serializer):
                 'work_email': email or '',
                 'first_name': first_name or '',
                 'last_name': last_name or '',
-                'role': role
             }
         )
+
+        if prof.role != role:
+            prof.role = role
 
         if validated_data.get('emp_id'):
             prof.emp_id = validated_data.get('emp_id')
@@ -246,7 +249,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
             'start_date', 'location', 'job_description', 'id_image',
             'bank_name', 'ifsc_code', 'account_number', 'branch',
             'aadhaar_number', 'aadhaar_image', 'pan', 'pan_image',
-            'passport_number', 'passport_image', 'profile_photo'
+            'passport_number', 'passport_image', 'profile_photo', 'role'
         ]
         valid_update_fields = [f for f in update_fields if hasattr(prof, f)]
         prof.save(update_fields=valid_update_fields)
@@ -790,21 +793,82 @@ class EmployeeSensitiveSelfSerializer(serializers.ModelSerializer):
     This serializer MUST NOT be used in list or profile APIs.
     """
 
+    aadhaar_front_image_url = serializers.SerializerMethodField()
+    aadhaar_back_image_url = serializers.SerializerMethodField()
+
+    pan_front_image_url = serializers.SerializerMethodField()
+    pan_back_image_url = serializers.SerializerMethodField()
+
+    passport_front_image_url = serializers.SerializerMethodField()
+    passport_back_image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = EmployeeProfile
         fields = (
             "aadhaar_number",
+
+            "aadhaar_front_image_url",
+            "aadhaar_back_image_url",
+
             "pan",
+            "pan_front_image_url",
+            "pan_back_image_url",
+
             "passport_number",
+            "passport_front_image_url",
+            "passport_back_image_url",
+
             "bank_name",
             "ifsc_code",
             "account_number",
             "branch",
         )
 
+    def _build_url(self, obj, field_name):
+        request = self.context.get("request")
+        if not request:
+            return None
+
+        if not getattr(obj, field_name):
+            return None
+
+        url = reverse(
+            "protected_employee_document",
+            args=[obj.emp_id, field_name]
+        )
+
+        return request.build_absolute_uri(url)
+
+    def get_aadhaar_front_image_url(self, obj):
+        return self._build_url(obj, "aadhaar_front_image")
+
+    def get_aadhaar_back_image_url(self, obj):
+        return self._build_url(obj, "aadhaar_back_image")
+
+    def get_pan_front_image_url(self, obj):
+        return self._build_url(obj, "pan_front_image")
+
+    def get_pan_back_image_url(self, obj):
+        return self._build_url(obj, "pan_back_image")
+
+    def get_passport_front_image_url(self, obj):
+        return self._build_url(obj, "passport_front_image")
+
+    def get_passport_back_image_url(self, obj):
+        return self._build_url(obj, "passport_back_image")
+
 
 class EmployeeSensitiveHRSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
+
+    aadhaar_front_image_url = serializers.SerializerMethodField()
+    aadhaar_back_image_url = serializers.SerializerMethodField()
+
+    pan_front_image_url = serializers.SerializerMethodField()
+    pan_back_image_url = serializers.SerializerMethodField()
+
+    passport_front_image_url = serializers.SerializerMethodField()
+    passport_back_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeProfile
@@ -813,14 +877,54 @@ class EmployeeSensitiveHRSerializer(serializers.ModelSerializer):
             "emp_id",
             "first_name",
             "last_name",
+
             "aadhaar_number",
+            "aadhaar_front_image_url",
+            "aadhaar_back_image_url",
+
             "pan",
+            "pan_front_image_url",
+            "pan_back_image_url",
+
             "passport_number",
+            "passport_front_image_url",
+            "passport_back_image_url",
+
             "bank_name",
             "ifsc_code",
             "account_number",
             "branch",
         )
+
+    def _build_url(self, obj, field_name):
+        request = self.context.get("request")
+        file = getattr(obj, field_name, None)
+
+        if not file:
+            return None
+
+        if request:
+            return request.build_absolute_uri(file.url)
+
+        return file.url
+
+    def get_aadhaar_front_image_url(self, obj):
+        return self._build_url(obj, "aadhaar_front_image")
+
+    def get_aadhaar_back_image_url(self, obj):
+        return self._build_url(obj, "aadhaar_back_image")
+
+    def get_pan_front_image_url(self, obj):
+        return self._build_url(obj, "pan_front_image")
+
+    def get_pan_back_image_url(self, obj):
+        return self._build_url(obj, "pan_back_image")
+
+    def get_passport_front_image_url(self, obj):
+        return self._build_url(obj, "passport_front_image")
+
+    def get_passport_back_image_url(self, obj):
+        return self._build_url(obj, "passport_back_image")
 
     def get_user(self, obj):
         return {

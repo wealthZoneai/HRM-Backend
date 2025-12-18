@@ -115,7 +115,6 @@ class ResetPasswordSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        # 1. Match passwords
         if data["new_password"] != data["confirm_password"]:
             raise serializers.ValidationError(
                 {"confirm_password": "Passwords do not match"}
@@ -123,32 +122,32 @@ class ResetPasswordSerializer(serializers.Serializer):
 
         pwd = data["new_password"]
 
-        # 2. Run Django validators (length, common, numeric, similarity)
         try:
             validate_password(pwd, user=None)
         except DjangoValidationError as e:
             raise serializers.ValidationError(
                 {"new_password": list(e.messages)})
 
-        # 3. Enforce uppercase
         if not re.search(r"[A-Z]", pwd):
             raise serializers.ValidationError({
                 "new_password": "Password must contain at least one uppercase letter."
             })
 
-        # 4. Enforce lowercase
         if not re.search(r"[a-z]", pwd):
             raise serializers.ValidationError({
                 "new_password": "Password must contain at least one lowercase letter."
             })
 
-        # 5. Enforce special character
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", pwd):
             raise serializers.ValidationError({
                 "new_password": "Password must contain at least one special character."
             })
 
-        # 6. OTP verification (unchanged)
+        if not re.search(r"[0-9]", pwd):
+            raise serializers.ValidationError({
+                "new_password": "Password must contain at least one number."
+            })
+
         email = data["email"].lower()
         otp = data["otp"]
 

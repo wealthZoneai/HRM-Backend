@@ -41,7 +41,13 @@ class EmployeeProfile(models.Model):
     )
 
     aadhaar_number = models.CharField(max_length=20, null=True, blank=True)
-    aadhaar_image = models.ImageField(
+    aadhaar_front_image = models.ImageField(
+        upload_to='ids/aadhaar/',
+        null=True,
+        blank=True,
+        validators=[validate_file_size, validate_image_extension]
+    )
+    aadhaar_back_image = models.ImageField(
         upload_to='ids/aadhaar/',
         null=True,
         blank=True,
@@ -49,7 +55,13 @@ class EmployeeProfile(models.Model):
     )
 
     pan = models.CharField(max_length=20, null=True, blank=True)
-    pan_image = models.ImageField(
+    pan_front_image = models.ImageField(
+        upload_to='ids/pan/',
+        null=True,
+        blank=True,
+        validators=[validate_file_size, validate_image_extension]
+    )
+    pan_back_image = models.ImageField(
         upload_to='ids/pan/',
         null=True,
         blank=True,
@@ -57,7 +69,13 @@ class EmployeeProfile(models.Model):
     )
 
     passport_number = models.CharField(max_length=20, null=True, blank=True)
-    passport_image = models.ImageField(
+    passport_front_image = models.ImageField(
+        upload_to='ids/passport/',
+        null=True,
+        blank=True,
+        validators=[validate_file_size, validate_image_extension]
+    )
+    passport_back_image = models.ImageField(
         upload_to='ids/passport/',
         null=True,
         blank=True,
@@ -65,7 +83,13 @@ class EmployeeProfile(models.Model):
     )
 
     id_card_number = models.CharField(max_length=50, null=True, blank=True)
-    id_card_image = models.ImageField(
+    id_card_front_image = models.ImageField(
+        upload_to='ids/idcard/',
+        null=True,
+        blank=True,
+        validators=[validate_file_size, validate_image_extension]
+    )
+    id_card_back_image = models.ImageField(
         upload_to='ids/idcard/',
         null=True,
         blank=True,
@@ -121,7 +145,7 @@ class EmployeeProfile(models.Model):
     ifsc_code = models.CharField(max_length=20, null=True, blank=True)
     branch = models.CharField(max_length=150, null=True, blank=True)
 
-    role = models.CharField(max_length=30, default='employee')
+    role = models.CharField(max_length=30)
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -447,40 +471,86 @@ class LeaveRequest(models.Model):
         ordering = ['-applied_at']
 
     def apply_tl_approval(self, approver_user, approve: bool, remarks: str = None):
-        if self.status != 'applied':
+        """
+        Team Lead approval logic.
+        Action must be explicit: approve=True or approve=False.
+        No implicit rejection is allowed.
+        """
+
+        if self.status != "applied":
             raise ValidationError(
                 "TL action is allowed only when leave status is 'applied'."
             )
-        self.tl = approver_user
-        self.tl_remarks = remarks or ''
-        self.last_action_by = approver_user
-        self.last_action_at = timezone.now()
-        if approve:
-            self.status = 'tl_approved'
-        else:
-            self.status = 'tl_rejected'
-        self.save()
 
-    def apply_hr_approval(self, approver_user, approve: bool, remarks: str = None):
-        if self.status == 'tl_rejected':
+        if self.last_action_by == approver_user:
             raise ValidationError(
-                {"detail": "HR cannot take action because TL has rejected this leave."}
+                "This leave has already been acted upon by you."
             )
 
-        if self.status not in ('tl_approved', 'pending_hr'):
-            raise ValidationError({"detail":
-                                   "HR action not allowed for current leave status."
-                                   })
+        if approve is not True and approve is not False:
+            raise ValidationError(
+                "TL action must be explicitly approve or reject.")
 
-        self.hr = approver_user
-        self.hr_remarks = remarks or ''
+        self.tl = approver_user
+        self.tl_remarks = remarks or ""
         self.last_action_by = approver_user
         self.last_action_at = timezone.now()
-        if approve:
-            self.status = 'hr_approved'
+
+        if approve is True:
+            self.status = "tl_approved"
         else:
-            self.status = 'hr_rejected'
-        self.save()
+            self.status = "tl_rejected"
+
+        self.save(
+            update_fields=[
+                "status",
+                "tl",
+                "tl_remarks",
+                "last_action_by",
+                "last_action_at",
+            ]
+        )
+
+    def apply_hr_approval(self, approver_user, approve: bool, remarks: str = None):
+        """
+        HR approval logic.
+        HR can act ONLY after TL approval.
+        Action must be explicit.
+        """
+
+        if self.status in ("hr_approved", "hr_rejected"):
+            raise ValidationError(
+                "Leave process already completed. No further action allowed."
+            )
+
+        if self.status != "tl_approved":
+            raise ValidationError(
+                "HR action is allowed only after TL approval."
+            )
+
+        if approve is not True and approve is not False:
+            raise ValidationError(
+                "HR action must be explicitly approve or reject.")
+
+        self.hr = approver_user
+        self.hr_remarks = remarks or ""
+        self.last_action_by = approver_user
+        self.last_action_at = timezone.now()
+
+        if approve is True:
+            self.status = "hr_approved"
+        else:
+            self.status = "hr_rejected"
+
+        self.save(
+            update_fields=[
+                "status",
+                "hr",
+                "hr_remarks",
+                "last_action_by",
+                "last_action_at",
+            ]
+        )
 
 
 class Policy(models.Model):
