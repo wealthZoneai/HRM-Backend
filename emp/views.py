@@ -932,7 +932,6 @@ class TimesheetDailyUpdateAPIView(APIView):
         date = serializer.validated_data["date"]
         entries = serializer.validated_data["entries"]
 
-        # 🔒 ALWAYS fetch fresh attendance from DB (single source of truth)
         attendance = Attendance.objects.filter(
             user=user,
             date=date
@@ -944,7 +943,6 @@ class TimesheetDailyUpdateAPIView(APIView):
                 status=400
             )
 
-        # 🔗 Ensure TimesheetDay is ALWAYS linked to attendance
         ts_day, created = TimesheetDay.objects.get_or_create(
             profile=prof,
             date=date
@@ -956,15 +954,12 @@ class TimesheetDailyUpdateAPIView(APIView):
                 status=400
             )
 
-        # 🔄 Force-correct linkage (important for old rows)
         ts_day.attendance = attendance
 
-        # ❌ Remove existing entries (safe because not submitted)
         TimesheetEntry.objects.filter(profile=prof, date=date).delete()
 
         saved = []
         for e in entries:
-            # ✅ Use local timezone correctly (NO double make_aware)
             start_dt = timezone.make_aware(
                 datetime.combine(date, e["start_time"]),
                 timezone.get_current_timezone()
@@ -1008,8 +1003,8 @@ class TimesheetDailyUpdateAPIView(APIView):
             "message": "Timesheet saved.",
             "date": date,
             "is_submitted": ts_day.is_submitted,
-            "clock_in": attendance.clock_in,
-            "clock_out": attendance.clock_out,
+            "clock_in": timezone.localtime(attendance.clock_in) if attendance.clock_in else None,
+            "clock_out": timezone.localtime(attendance.clock_out) if attendance.clock_out else None,
             "total_hours": round(total_seconds / 3600, 2),
             "entries": entries_out
         }, status=201)
