@@ -722,8 +722,9 @@ class PolicySerializer(serializers.ModelSerializer):
 
 
 class TimesheetEntrySerializer(serializers.ModelSerializer):
+    start_time = serializers.SerializerMethodField()
+    end_time = serializers.SerializerMethodField()
     duration_hours = serializers.SerializerMethodField()
-
     duration_seconds = serializers.SerializerMethodField()
 
     class Meta:
@@ -736,11 +737,15 @@ class TimesheetEntrySerializer(serializers.ModelSerializer):
             "duration_hours",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["duration_seconds",
-                            "duration_hours", "created_at", "updated_at"]
+        read_only_fields = [
+            "duration_seconds",
+            "duration_hours",
+            "created_at",
+            "updated_at",
+        ]
 
+    # 🔒 SAFE duration handling (unchanged)
     def _get_total_seconds_safe(self, obj):
-        """Return int seconds even if DB contains string or None."""
         try:
             return int(obj.duration_seconds) if obj.duration_seconds is not None else 0
         except (TypeError, ValueError):
@@ -752,10 +757,17 @@ class TimesheetEntrySerializer(serializers.ModelSerializer):
 
     def get_duration_seconds(self, obj):
         total = self._get_total_seconds_safe(obj)
-        hours = total // 3600
-        minutes = (total % 3600) // 60
-        seconds = total % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        h = total // 3600
+        m = (total % 3600) // 60
+        s = total % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    # ✅ THIS IS THE MISSING PIECE (CRITICAL)
+    def get_start_time(self, obj):
+        return timezone.localtime(obj.start_time) if obj.start_time else None
+
+    def get_end_time(self, obj):
+        return timezone.localtime(obj.end_time) if obj.end_time else None
 
 
 class TimesheetDaySerializer(serializers.ModelSerializer):
