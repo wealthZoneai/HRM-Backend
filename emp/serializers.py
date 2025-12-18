@@ -471,11 +471,16 @@ class EmployeeIdentificationSerializer(serializers.ModelSerializer):
         model = EmployeeProfile
         fields = (
             'aadhaar_number',
+            'aadhaar_front_image',
+            'aadhaar_back_image',
+
             'pan',
+            'pan_front_image',
+            'pan_back_image',
+
             'passport_number',
-            'aadhaar_image',
-            'pan_image',
-            'passport_image',
+            'passport_front_image',
+            'passport_back_image',
         )
 
     def validate(self, data):
