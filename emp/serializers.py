@@ -773,76 +773,73 @@ class TimesheetEntryItemSerializer(serializers.Serializer):
 
 
 class DailyTimesheetUpdateSerializer(serializers.Serializer):
+    date = serializers.DateField()
     entries = TimesheetEntryItemSerializer(many=True)
 
     def validate(self, data):
-        entries = data.get("entries", [])
-        if not entries:
-            raise ValidationError("Entries list cannot be empty.")
-
-        today = timezone.localdate()
-
         request = self.context.get("request")
-        if not request or not getattr(request, "user", None) or not request.user.is_authenticated:
-            raise ValidationError(
-                "Request and authenticated user must be provided in serializer context."
-            )
-
         user = request.user
+        prof = user.employeeprofile
 
-        attendance = Attendance.objects.filter(user=user, date=today).first()
+        date = data["date"]
+        entries = data["entries"]
+
+        if not entries:
+            raise ValidationError("Entries cannot be empty.")
+
+        if date > timezone.localdate():
+            raise ValidationError("Future dates are not allowed.")
+
+        attendance = Attendance.objects.filter(user=user, date=date).first()
         if not attendance or not attendance.clock_in:
-            raise ValidationError(
-                "You must clock in (attendance) before updating today's timesheet."
-            )
+            raise ValidationError("Attendance clock-in is required.")
 
-        login_dt = attendance.clock_in  # timezone-aware
-        cutoff_dt = attendance.clock_out or timezone.now()
+        ts_day, _ = TimesheetDay.objects.get_or_create(
+            profile=prof,
+            date=date,
+            defaults={"attendance": attendance}
+        )
+
+        if ts_day.is_submitted:
+            raise ValidationError("Timesheet already submitted and locked.")
+
+        login_dt = attendance.clock_in
+        logout_dt = attendance.clock_out
 
         intervals = []
 
-        for idx, it in enumerate(entries, start=1):
-            s = it["start_time"]   # datetime.time
-            e = it["end_time"]     # datetime.time
+        for idx, e in enumerate(entries, start=1):
+            s = e["start_time"]
+            en = e["end_time"]
 
-            if s >= e:
+            if s >= en:
                 raise ValidationError(
-                    {"entries": f"Entry #{idx} end_time must be after start_time."}
-                )
+                    f"Entry #{idx}: end_time must be after start_time.")
 
-            s_dt = timezone.make_aware(datetime.combine(today, s))
-            e_dt = timezone.make_aware(datetime.combine(today, e))
-
-            if (e_dt - s_dt).total_seconds() > 6 * 3600:
-                raise ValidationError(
-                    {"entries": f"Entry #{idx} cannot exceed 6 hours."}
-                )
+            s_dt = timezone.make_aware(datetime.combine(date, s))
+            e_dt = timezone.make_aware(datetime.combine(date, en))
 
             if s_dt < login_dt:
-                raise ValidationError(
-                    {"entries": f"Entry #{idx} starts before your attendance clock-in ({login_dt})."}
-                )
+                raise ValidationError(f"Entry #{idx}: starts before clock-in.")
 
-            if e_dt > cutoff_dt:
-                if attendance.clock_out:
-                    raise ValidationError(
-                        {"entries": f"Entry #{idx} ends after attendance clock-out ({attendance.clock_out})."}
-                    )
-                else:
-                    raise ValidationError(
-                        {"entries": f"Entry #{idx} end_time cannot be in the future."}
-                    )
+            if logout_dt and e_dt > logout_dt:
+                raise ValidationError(f"Entry #{idx}: ends after clock-out.")
+
+            if not logout_dt and e_dt > timezone.now():
+                raise ValidationError(
+                    f"Entry #{idx}: future time not allowed.")
+
+            if (e_dt - s_dt).total_seconds() > 6 * 3600:
+                raise ValidationError(f"Entry #{idx}: exceeds 6 hours.")
 
             intervals.append((s_dt, e_dt))
 
-        # Overlap check (datetime-safe)
-        intervals.sort(key=lambda x: x[0])
+        intervals.sort()
         for i in range(1, len(intervals)):
             if intervals[i][0] < intervals[i - 1][1]:
-                raise ValidationError(
-                    "Submitted time entries cannot overlap each other."
-                )
+                raise ValidationError("Time entries overlap.")
 
+        data["attendance"] = attendance
         return data
 
 

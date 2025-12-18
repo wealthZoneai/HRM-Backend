@@ -76,6 +76,10 @@ urlpatterns = [
     path('timesheet/daily/form/', views.TimesheetDailyFormAPIView.as_view(),
          name='timesheet_daily_form'),
 
+    path('timesheet/daily/submit/', views.TimesheetSubmitAPIView.as_view(),
+         name='timesheet_daily_submit'),
+
+
     path('timesheet/hr/daily/',
          views.TimesheetDailyForHRAPIView.as_view(), name='timesheet_hr_daily'),
 

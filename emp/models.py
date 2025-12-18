@@ -573,10 +573,32 @@ class Policy(models.Model):
 
 class TimesheetDay(models.Model):
     profile = models.ForeignKey(
-        'EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_days')
+        'EmployeeProfile', on_delete=models.CASCADE, related_name='timesheet_days'
+    )
     date = models.DateField()
+
+    attendance = models.OneToOneField(
+        'Attendance',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='timesheet_day'
+    )
+
     clock_in = models.DateTimeField(null=True, blank=True)
     clock_out = models.DateTimeField(null=True, blank=True)
+
+    is_submitted = models.BooleanField(default=False)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    last_modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='modified_timesheets'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -585,7 +607,7 @@ class TimesheetDay(models.Model):
         ordering = ['-date']
 
     def __str__(self):
-        return f"{getattr(self.profile, 'emp_id', self.profile.id)} - {self.date}"
+        return f"{self.profile.emp_id} - {self.date}"
 
 
 class TimesheetEntry(models.Model):

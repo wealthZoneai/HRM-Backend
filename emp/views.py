@@ -727,8 +727,6 @@ class HREmployeeSensitiveDetailsAPIView(APIView):
         })
 
 
-
-
 class HRTLActionAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTLorHRorOwner]
 
@@ -918,85 +916,103 @@ class TimesheetDailyFormAPIView(APIView):
 
 
 class TimesheetDailyUpdateAPIView(APIView):
-    """
-    POST -> create / replace today's entries for the logged-in employee.
-
-    All business rules are enforced in DailyTimesheetUpdateSerializer.validate():
-      - employee must have Attendance clock_in for today
-      - entries must be for today's date
-      - entries cannot start before Attendance.clock_in
-      - if Attendance.clock_out exists: entries cannot go beyond clock_out
-      - if Attendance.clock_out does NOT exist: entries cannot go beyond now
-      - max 6 hours per entry
-      - entries cannot overlap
-    """
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request):
         user = request.user
-        prof = getattr(user, "employeeprofile", None)
-        if not prof:
-            return Response({"detail": "Employee profile not found."}, status=400)
+        prof = user.employeeprofile
 
-        today = timezone.localdate()
-
-        ser = DailyTimesheetUpdateSerializer(
+        serializer = DailyTimesheetUpdateSerializer(
             data=request.data,
             context={"request": request}
         )
-        ser.is_valid(raise_exception=True)
-        payload = ser.validated_data
-        entries_data = payload["entries"]
+        serializer.is_valid(raise_exception=True)
+
+        date = serializer.validated_data["date"]
+        entries = serializer.validated_data["entries"]
+        attendance = serializer.validated_data["attendance"]
 
         ts_day, _ = TimesheetDay.objects.get_or_create(
-            profile=prof, date=today)
+            profile=prof,
+            date=date,
+            defaults={"attendance": attendance}
+        )
 
-        TimesheetEntry.objects.filter(profile=prof, date=today).delete()
-        saved_objs = []
-        for item in entries_data:
-
-            if isinstance(item["start_time"], datetime):
-                start_dt = item["start_time"]
-            else:
-                start_dt = timezone.make_aware(
-                    datetime.combine(today, item["start_time"])
-                )
-
-            if isinstance(item["end_time"], datetime):
-                end_dt = item["end_time"]
-            else:
-                end_dt = timezone.make_aware(
-                    datetime.combine(today, item["end_time"])
-                )
-
-            obj = TimesheetEntry.objects.create(
-                profile=prof,
-                date=today,
-                day=today.strftime("%A"),
-                task=item["task"],
-                description=item.get("description", ""),
-                start_time=start_dt,
-                end_time=end_dt,
+        if ts_day.is_submitted:
+            return Response(
+                {"detail": "Timesheet already submitted."},
+                status=400
             )
-            saved_objs.append(obj)
 
-        if saved_objs:
-            ts_day.clock_in = min(o.start_time for o in saved_objs)
-            ts_day.clock_out = max(o.end_time for o in saved_objs)
-            ts_day.save()
+        # ❌ REMOVE OLD ENTRIES
+        TimesheetEntry.objects.filter(profile=prof, date=date).delete()
 
-        total_seconds = sum(o.duration_seconds or 0 for o in saved_objs)
-        total_hours = round(total_seconds / 3600.0, 2)
+        saved = []
+        for e in entries:
+            start_dt = timezone.make_aware(
+                datetime.combine(date, e["start_time"]))
+            end_dt = timezone.make_aware(datetime.combine(date, e["end_time"]))
 
-        entries_out = TimesheetEntrySerializer(saved_objs, many=True).data
+            saved.append(
+                TimesheetEntry.objects.create(
+                    profile=prof,
+                    date=date,
+                    day=date.strftime("%A"),
+                    task=e["task"],
+                    description=e.get("description", ""),
+                    start_time=start_dt,
+                    end_time=end_dt,
+                )
+            )
+
+        ts_day.clock_in = min(o.start_time for o in saved)
+        ts_day.clock_out = max(o.end_time for o in saved)
+        ts_day.last_modified_by = user
+        ts_day.save()
+
+        total_seconds = sum(o.duration_seconds or 0 for o in saved)
 
         return Response({
-            "message": "Timesheet updated successfully",
-            "date": today.isoformat(),
-            "entries": entries_out,
-            "total_hours_workdone": total_hours,
+            "message": "Timesheet saved (not submitted)",
+            "date": date,
+            "total_hours": round(total_seconds / 3600, 2)
         }, status=201)
+
+
+class TimesheetSubmitAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        prof = user.employeeprofile
+        date = request.data.get("date")
+
+        if not date:
+            return Response({"detail": "date is required"}, status=400)
+
+        date = parse_date(date)
+        ts_day = get_object_or_404(
+            TimesheetDay,
+            profile=prof,
+            date=date
+        )
+
+        if ts_day.is_submitted:
+            return Response({"detail": "Already submitted"}, status=400)
+
+        if not TimesheetEntry.objects.filter(profile=prof, date=date).exists():
+            return Response({"detail": "No entries to submit"}, status=400)
+
+        ts_day.is_submitted = True
+        ts_day.submitted_at = timezone.now()
+        ts_day.last_modified_by = user
+        ts_day.save()
+
+        return Response({
+            "message": "Timesheet submitted and locked",
+            "date": date
+        }, status=200)
 
 
 class TimesheetDailyForHRAPIView(APIView):
