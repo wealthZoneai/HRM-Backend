@@ -560,9 +560,26 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 
 class AttendanceReadSerializer(serializers.ModelSerializer):
+    total_hours = serializers.SerializerMethodField()
+    overtime = serializers.SerializerMethodField()
+
     class Meta:
         model = Attendance
         fields = '__all__'
+
+    def format_time(self, duration):
+        if not duration:
+            return "0h 0m"
+        seconds = duration.total_seconds()
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        return f"{h}h {m}m"
+
+    def get_total_hours(self, obj):
+        return self.format_time(obj.total_hours)
+
+    def get_overtime(self, obj):
+        return self.format_time(obj.overtime)
 
 
 class TodayAttendanceSerializer(serializers.ModelSerializer):

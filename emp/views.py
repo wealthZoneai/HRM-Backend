@@ -30,7 +30,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from hr.models import Announcement
 from hr.serializers import AnnouncementSerializer
-from datetime import datetime
+from datetime import datetime, time
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
@@ -333,6 +333,43 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
         else:
             return models.Attendance.objects.filter(user=user).order_by('-date')[:30]
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        total_seconds = 0
+        overtime_seconds = 0
+        late_arrivals = 0
+
+        for att in queryset:
+            if att.total_hours:
+                total_seconds += att.total_hours.total_seconds()
+
+            if att.overtime:
+                overtime_seconds += att.overtime.total_seconds()
+
+            if att.late_arrivals:
+                late_arrivals += 1
+
+        total_hours_str = self.format_time(total_seconds)
+        overtime_str = self.format_time(overtime_seconds)
+
+        # ---------- Serialize daily records ----------
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+
+        # ---------- Inject monthly data into each record ----------
+        for record in data:
+            record["total_hours"] = total_hours_str
+            record["overtime"] = overtime_str
+            record["late_arrivals"] = late_arrivals
+
+        return Response(data)
+
+    def format_time(self, seconds):
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        return f"{h:02d}:{m:02d}"
+
 
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
@@ -599,7 +636,7 @@ class LeaveApplyAPIView(APIView):
         )
 
         hr_users = User.objects.filter(
-            role__in=["hr", "management"], is_active=True)
+            role__iexact="hr", is_active=True)
 
         Notification.objects.bulk_create([
             Notification(

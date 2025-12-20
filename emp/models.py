@@ -4,7 +4,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
-from datetime import timedelta
+from datetime import timedelta, time
 from decimal import Decimal
 from .constants import LEAVE_TYPE_CHOICES
 
@@ -186,6 +186,7 @@ class Notification(models.Model):
         ('anniversary', 'Anniversary'),
         ('leave', 'Leave'),
         ('payroll', 'Payroll'),
+        ('policy', 'Policy'),
     ]
     to_user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
@@ -237,8 +238,11 @@ class Attendance(models.Model):
         null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='working')
+    late_arrivals = models.BooleanField(default=False)
     reminder_count = models.PositiveIntegerField(default=0)
     last_reminder_at = models.DateTimeField(null=True, blank=True)
+    total_hours = models.DurationField(null=True, blank=True)
+    overtime = models.DurationField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

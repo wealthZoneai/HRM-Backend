@@ -451,6 +451,18 @@ class HRLeaveActionAPIView(APIView):
         action = request.data.get('action')
         remarks = request.data.get('remarks', '')
 
+        if not action:
+            return Response(
+                {"detail": "Action is required. Use 'approve or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if action not in ['approve', 'reject']:
+            return Response(
+                {"detail": "Invalid action. Allowed values: approve, reject."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         lr = get_object_or_404(LeaveRequest, id=leave_id)
 
         # 🔒 If TL exists, HR must wait for TL approval
