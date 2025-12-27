@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404, render
 from django.db.models import Sum, Count
 import calendar
-from datetime import timedelta
+from datetime import timedelta, time
 from . import models, serializers
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -264,27 +264,6 @@ class ClockInAPIView(APIView):
 class ClockOutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def clockout_reminder_logic(self, att):
-        now = timezone.now()
-        worked_time = now - att.clock_in
-
-        if worked_time < timedelta(hours=2):
-            return None
-
-        if att.reminder_count >= 4:
-            return None
-
-        if att.last_reminder_at:
-            next_allowed_time = att.last_reminder_at + timedelta(minutes=15)
-            if now < next_allowed_time:
-                return None
-
-        att.reminder_count += 1
-        att.last_reminder_at = now
-        att.save(update_fields=["reminder_count", "last_reminder_at"])
-
-        return f"Reminder {att.reminder_count}/4: You have completed 9 hours. Please clock out."
-
     def post(self, request):
         user = request.user
         today = timezone.localdate()
@@ -306,16 +285,11 @@ class ClockOutAPIView(APIView):
                 status=400
             )
 
-        reminder = self.clockout_reminder_logic(att)
-
         att.clock_out = timezone.now()
         att.compute_duration_and_overtime()
         att.save()
 
         data = serializers.AttendanceReadSerializer(att).data
-
-        if reminder:
-            data["reminder"] = reminder
 
         return Response(data, status=200)
 
@@ -942,14 +916,24 @@ class TimesheetDailyFormAPIView(APIView):
 
         entries_ser = TimesheetEntrySerializer(entries_qs, many=True).data
 
-        clock_in = ts_day.clock_in or (
+        attendance = Attendance.objects.filter(user=user, date=today).first()
+
+        att_clock_in = attendance.clock_in if attendance else None
+        att_clock_out = attendance.clock_out if attendance else None
+
+        clock_in = att_clock_in or ts_day.clock_in or (
             entries_qs.first().start_time if entries_qs.exists() else None
         )
-        clock_out = ts_day.clock_out or (
+        clock_out = att_clock_out or ts_day.clock_out or (
             entries_qs.last().end_time if entries_qs.exists() else None
         )
 
-        total_seconds = sum(e.duration_seconds or 0 for e in entries_qs)
+        if attendance and attendance.duration_seconds:
+            total_seconds = attendance.duration_seconds
+
+        else:
+            total_seconds = sum(e.duration_seconds or 0 for e in entries_qs)
+
         total_hours = round(total_seconds / 3600.0, 2)
 
         return Response({
@@ -1630,3 +1614,37 @@ class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
                 notif_type='policy',
                 is_read=False
             )
+
+
+class HRDashboardStatsAPIView(APIView):
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+        today = timezone.localdate()
+
+        # Total Employees (active, role='employee')
+        # You might want to include 'intern' or 'tl' depending on business logic,
+        # but usually 'employee' + 'tl' + 'intern' are the workforce.
+        # Let's count all except HR/Management/Owner for now, or specifically listed roles.
+        # Based on serializer choices: employee, intern, tl, hr, management.
+        # Workforce = employee, intern, tl.
+
+        workforce_roles = ['employee', 'intern', 'tl']
+        total_employees = User.objects.filter(
+            role__in=workforce_roles, is_active=True).count()
+
+        # Present Today
+        present_today = Attendance.objects.filter(
+            date=today,
+            user__role__in=workforce_roles,
+            status__in=['Working', 'Completed']
+        ).values('user').distinct().count()
+
+        # On Leave (Total - Present)
+        on_leave = max(0, total_employees - present_today)
+
+        return Response({
+            'total_employees': total_employees,
+            'present_today': present_today,
+            'on_leave': on_leave
+        })

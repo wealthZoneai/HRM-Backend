@@ -73,7 +73,7 @@ class BankSerializer(serializers.Serializer):
 
 class IdentificationSerializer(serializers.Serializer):
     aadhaar_number = serializers.CharField(
-        required=False, allow_blank=True, max_length=32)
+        required=False, allow_blank=True, max_length=12)
     aadhaar_image = serializers.ImageField(required=False, allow_null=True)
     pan_number = serializers.CharField(
         required=False, allow_blank=True, max_length=20)
@@ -452,6 +452,10 @@ class EmployeeContactUpdateSerializer(serializers.ModelSerializer):
         errors = {}
 
         for field, value in data.items():
+
+            if field == 'profile_photo':
+                continue
+
             existing_value = getattr(instance, field, None)
 
             if existing_value not in (None, "", []):
@@ -461,6 +465,12 @@ class EmployeeContactUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         return data
+
+
+class EmployeeProfileImageUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeProfile
+        fields = ('profile_photo')
 
 
 class EmployeeIdentificationSerializer(serializers.ModelSerializer):

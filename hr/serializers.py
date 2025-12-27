@@ -205,6 +205,13 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('created_by',)
 
+    def to_internal_value(self, data):
+        if 'priority' in data and isinstance(data['priority'], str):
+            data['priority'] = data['priority'].upper()
+        if 'department' in data and isinstance(data['department'], str):
+            data['department'] = data['department'].upper()
+        return super().to_internal_value(data)
+
     def validate(self, attrs):
         date = attrs.get('date')
         time = attrs.get('time')

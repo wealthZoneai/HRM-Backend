@@ -102,6 +102,9 @@ urlpatterns = [
 
     path('timesheet/tl/yearly/',
          views.TimesheetYearlyForTLAPIView.as_view(), name='timesheet_tl_yearly'),
+
+    path('hr/dashboard/stats/', views.HRDashboardStatsAPIView.as_view(),
+         name='hr-dashboard-stats'),
 ]
 
 urlpatterns += [

@@ -41,7 +41,7 @@ class EmployeeProfile(models.Model):
         validators=[validate_file_size, validate_image_extension]
     )
 
-    aadhaar_number = models.CharField(null=True, blank=True)
+    aadhaar_number = models.CharField(max_length=12, null=True, blank=True)
     aadhaar_front_image = models.ImageField(
         upload_to='ids/aadhaar/',
         null=True,
@@ -232,15 +232,13 @@ class Attendance(models.Model):
     clock_in = models.DateTimeField()
     clock_out = models.DateTimeField(null=True, blank=True)
 
-    duration_time = models.CharField(
+    duration_time = models.DurationField(
         max_length=20, null=True, blank=True)
     duration_seconds = models.IntegerField(
         null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='working')
     late_arrivals = models.BooleanField(default=False)
-    reminder_count = models.PositiveIntegerField(default=0)
-    last_reminder_at = models.DateTimeField(null=True, blank=True)
     total_hours = models.DurationField(default=timedelta())
     overtime = models.DurationField(null=True, blank=True)
 
@@ -275,13 +273,6 @@ class Attendance(models.Model):
 
         end_time = self.clock_out or timezone.now()
         return end_time - self.clock_in
-
-    def needs_clockout_reminder(self):
-        return (
-            self.check_in
-            and not self.clock_out
-            and self.worked_duration() >= timedelta(hours=9, minutes=0)
-        )
 
 
 class CalendarEvent(models.Model):
