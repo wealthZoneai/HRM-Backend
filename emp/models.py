@@ -241,7 +241,7 @@ class Attendance(models.Model):
     late_arrivals = models.BooleanField(default=False)
     reminder_count = models.PositiveIntegerField(default=0)
     last_reminder_at = models.DateTimeField(null=True, blank=True)
-    total_hours = models.DurationField(null=True, blank=True)
+    total_hours = models.DurationField(default=timedelta())
     overtime = models.DurationField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -252,30 +252,22 @@ class Attendance(models.Model):
         ordering = ['-date']
 
     def compute_duration_and_overtime(self, standard_seconds=9*3600):
-        """
-        Calculate duration_time (HH:MM:SS) and duration_seconds.
-        Default standard_seconds = 9 hours.
-        """
         if not self.clock_in or not self.clock_out:
+            self.duration_time = None
+            self.duration_seconds = 0
+            self.status = 'working'
             return
         delta = self.clock_out - self.clock_in
         total_seconds = int(delta.total_seconds())
-        hrs = total_seconds // 3600
-        mins = (total_seconds % 3600) // 60
-        secs = total_seconds % 60
-        self.duration_time = f"{hrs:02}:{mins:02}:{secs:02}"
-        self.duration_seconds = total_seconds
-
+        self.duration_time = delta              # ✅ timedelta
+        self.duration_seconds = total_seconds   # ✅ int
         hours = total_seconds / 3600.0
-
         if hours >= 9:
             self.status = 'present'
         elif 2 <= hours < 9:
             self.status = 'halfday'
-        elif hours < 2:
-            self.status = 'absent'
         else:
-            self.status = 'working'
+            self.status = 'absent'
 
     def worked_duration(self):
         if not self.clock_in:

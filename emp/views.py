@@ -338,37 +338,47 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
 
         total_seconds = 0
         overtime_seconds = 0
-        late_arrivals = 0
+        monthly_late_count = 0
 
+        late_time_limit = time(9, 45)
+        regular_work_seconds = 9 * 60 * 60
+
+        # -------- Monthly Calculations --------
         for att in queryset:
-            if att.total_hours:
-                total_seconds += att.total_hours.total_seconds()
+            worked_seconds = 0
 
-            if att.overtime:
-                overtime_seconds += att.overtime.total_seconds()
+            # ✅ Total hours = sum of duration_time
+            if att.clock_in and att.clock_out and att.duration_time:
+                worked_seconds = att.duration_time.total_seconds()
+                total_seconds += worked_seconds
 
-            if att.late_arrivals:
-                late_arrivals += 1
+                # ✅ Overtime after 9 hours
+            if worked_seconds > regular_work_seconds:
+                overtime_seconds += (worked_seconds - regular_work_seconds)
+
+            # ✅ Late arrivals (after 09:30 AM)
+            if att.clock_in and att.clock_in.time() > late_time_limit:
+                monthly_late_count += 1
 
         total_hours_str = self.format_time(total_seconds)
         overtime_str = self.format_time(overtime_seconds)
 
-        # ---------- Serialize daily records ----------
+        # -------- Serialize daily records --------
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
 
-        # ---------- Inject monthly data into each record ----------
+        # -------- Inject monthly values (KEEP SAME FORMAT) --------
         for record in data:
             record["total_hours"] = total_hours_str
             record["overtime"] = overtime_str
-            record["late_arrivals"] = late_arrivals
+            record["late_arrivals"] = monthly_late_count
 
         return Response(data)
 
     def format_time(self, seconds):
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        return f"{h:02d}:{m:02d}"
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours:02d}:{minutes:02d}"
 
 
 class TodayAttendanceView(APIView):

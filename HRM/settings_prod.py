@@ -31,13 +31,11 @@ else:
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get(
-            "DATABASE_URL=postgresql://hrmuser:strongpassword123!@hrms-portal-db.cmncis6y60g6.us-east-1.rds.amazonaws.com:5432/hrmdb"),
+        default=os.environ.get("DATABASE_URL"),
         conn_max_age=600,
         ssl_require=True
     )
 }
-
 
 CORS_ALLOW_ALL_ORIGINS = False
 cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
