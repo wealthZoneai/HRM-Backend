@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from datetime import datetime
 from django.utils import timezone
 from django.urls import reverse
-from .constants import LEAVE_TYPE_CHOICES
+from .constants import LEAVE_TYPE_CHOICES, EMPLOYEE_DEPARTMENT_CHOICES
 from decimal import Decimal
 
 User = get_user_model()
@@ -44,7 +44,10 @@ class ContactSerializer(serializers.Serializer):
 
 class JobSerializer(serializers.Serializer):
     job_title = serializers.CharField(required=True, max_length=150)
-    department = serializers.CharField(required=True)
+    department = serializers.ChoiceField(
+        choices=EMPLOYEE_DEPARTMENT_CHOICES,
+        required=True
+    )
     team_lead = serializers.CharField(
         required=False, allow_blank=True, allow_null=True)
     employment_type = serializers.ChoiceField(choices=[(

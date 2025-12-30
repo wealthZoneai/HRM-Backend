@@ -208,8 +208,8 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         if 'priority' in data and isinstance(data['priority'], str):
             data['priority'] = data['priority'].upper()
-        if 'department' in data and isinstance(data['department'], str):
-            data['department'] = data['department'].upper()
+        if 'audience' in data and isinstance(data['audience'], str):
+            data['audience'] = data['audience'].upper()
         return super().to_internal_value(data)
 
     def validate(self, attrs):

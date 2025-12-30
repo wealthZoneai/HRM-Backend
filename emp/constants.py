@@ -6,3 +6,17 @@ LEAVE_TYPE_CHOICES = [
     ("MATERNITY", "Maternity Leave"),
     ("PATERNITY", "Paternity Leave"),
 ]
+
+EMPLOYEE_DEPARTMENT_CHOICES = [
+    ("Python", "Python"),
+    ("Testing", "Testing"),
+    ("Java", "Java"),
+    ("UI/UX", "UI/UX"),
+    ("React", "React"),
+    ("Cyber Security", "Cyber Security"),
+    ("Digital Marketing", "Digital Marketing"),
+    ("HR", "HR"),
+    ("BDM", "BDM"),
+    ("Networking", "Networking"),
+    ("Cloud", "Cloud (AWS / DevOps)"),
+]

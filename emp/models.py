@@ -6,7 +6,7 @@ from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
 from datetime import timedelta, time
 from decimal import Decimal
-from .constants import LEAVE_TYPE_CHOICES
+from .constants import LEAVE_TYPE_CHOICES, EMPLOYEE_DEPARTMENT_CHOICES
 
 
 User = settings.AUTH_USER_MODEL
@@ -99,22 +99,9 @@ class EmployeeProfile(models.Model):
 
     job_title = models.CharField(max_length=150, null=True, blank=True)
 
-    DEPARTMENT_CHOICES = [
-        ('Python', 'Python'),
-        ('Testing', 'Testing'),
-        ('Java', 'Java'),
-        ('UI/UX', 'UI/UX'),
-        ('React', 'React'),
-        ('Cyber Security', 'Cyber Security'),
-        ('Digital Marketing', 'Digital Marketing'),
-        ('HR', 'HR'),
-        ('BDM', 'BDM'),
-        ('Networking', 'Networking'),
-        ('Cloud', 'Cloud (AWS/DevOps)'),
-    ]
 
     department = models.CharField(
-        max_length=100, choices=DEPARTMENT_CHOICES, blank=True, null=True)
+        max_length=100, choices=EMPLOYEE_DEPARTMENT_CHOICES, blank=True, null=True)
 
     designation = models.CharField(max_length=100, null=True, blank=True)
     date_of_joining = models.DateField(null=True, blank=True)

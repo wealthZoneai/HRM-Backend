@@ -3,17 +3,10 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from decimal import Decimal
+from .constants import ANNOUNCEMENT_AUDIENCE_CHOICES
 
 
 class Announcement(models.Model):
-    DEPARTMENT_CHOICES = [
-        ("HR", "Human Resources"),
-        ("EMP", "Employee"),
-        ("TL", "Team Lead"),
-        ("FIN", "Finance"),
-        ("MKT", "Marketing"),
-        ("IT", "IT Department"),
-    ]
 
     PRIORITY_CHOICES = [
         ("LOW", "Low"),
@@ -25,7 +18,7 @@ class Announcement(models.Model):
     description = models.TextField()
     date = models.DateField()
     time = models.TimeField()
-    department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES)
+    audience = models.CharField(max_length=50, choices=ANNOUNCEMENT_AUDIENCE_CHOICES)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
