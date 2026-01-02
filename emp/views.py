@@ -1622,12 +1622,21 @@ class HRDashboardStatsAPIView(APIView):
     def get(self, request):
         today = timezone.localdate()
 
-        # Total Employees (active, role='employee')
-        # You might want to include 'intern' or 'tl' depending on business logic,
-        # but usually 'employee' + 'tl' + 'intern' are the workforce.
-        # Let's count all except HR/Management/Owner for now, or specifically listed roles.
-        # Based on serializer choices: employee, intern, tl, hr, management.
-        # Workforce = employee, intern, tl.
+        # 1. Total Active Employees
+        total_employees = EmployeeProfile.objects.filter(
+            is_active=True).count()
+
+        # 2. Present Employees (Clocked in today)
+        present_employees = Attendance.objects.filter(
+            date=today
+        ).exclude(status='absent').count()
+
+        # 3. On Leave Employees (Approved leaves active today)
+        on_leave_employees = models.LeaveRequest.objects.filter(
+            start_date__lte=today,
+            end_date__gte=today,
+            status__in=['hr_approved', 'tl_approved']
+        ).count()
 
         workforce_roles = ['employee', 'intern', 'tl']
         total_employees = User.objects.filter(
@@ -1644,7 +1653,7 @@ class HRDashboardStatsAPIView(APIView):
         on_leave = max(0, total_employees - present_today)
 
         return Response({
-            'total_employees': total_employees,
-            'present_today': present_today,
-            'on_leave': on_leave
+            "total_employees": total_employees,
+            "present_employees": present_employees,
+            "on_leave_employees": on_leave_employees
         })

@@ -44,7 +44,7 @@ if cors_origins:
         o.strip() for o in cors_origins.split(",") if o.strip()
     ]
 else:
-    CORS_ALLOWED_ORIGINS = []
+    raise RuntimeError("CORS_ALLOWED_ORIGINS must be set in production")
 
 
 csrf_trusted = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
@@ -53,12 +53,13 @@ if csrf_trusted:
         o.strip() for o in csrf_trusted.split(",") if o.strip()
     ]
 else:
-    CSRF_TRUSTED_ORIGINS = []
+    raise RuntimeError("CSRF_TRUSTED_ORIGINS must be set in production")
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get(
     "SECURE_HSTS_INCLUDE_SUBDOMAINS", "False") == "True"
 SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "False") == "True"
@@ -66,6 +67,7 @@ SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "False") == "True"
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 LOGGING = {
     "version": 1,

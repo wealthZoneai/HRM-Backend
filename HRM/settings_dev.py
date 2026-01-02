@@ -8,6 +8,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 MEDIA_ROOT = BASE_DIR / "media"
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
 
 # DATABASES = {
 #     'default': {
