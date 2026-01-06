@@ -9,14 +9,7 @@ from django.core.management.utils import get_random_secret_key
 import dj_database_url
 
 
-env_secret = os.environ.get("SECRET_KEY")
-if env_secret:
-    SECRET_KEY = env_secret
-else:
-    try:
-        SECRET_KEY
-    except NameError:
-        SECRET_KEY = get_random_secret_key()
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
