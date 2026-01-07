@@ -228,7 +228,7 @@ class Attendance(models.Model):
     late_arrivals = models.BooleanField(default=False)
     total_hours = models.DurationField(default=timedelta())
     overtime = models.DurationField(null=True, blank=True)
-
+    note = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

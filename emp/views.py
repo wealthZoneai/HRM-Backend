@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404, render
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 import calendar
 from datetime import timedelta, time
 from . import models, serializers
@@ -331,8 +331,10 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
                 overtime_seconds += (worked_seconds - regular_work_seconds)
 
             # ✅ Late arrivals (after 09:30 AM)
-            if att.clock_in and att.clock_in.time() > late_time_limit:
-                monthly_late_count += 1
+            if att.clock_in:
+                clock_in_time = att.clock_in.astimezone().time()
+                if clock_in_time > late_time_limit:
+                    monthly_late_count += 1
 
         total_hours_str = self.format_time(total_seconds)
         overtime_str = self.format_time(overtime_seconds)
@@ -352,7 +354,7 @@ class MyAttendanceDaysAPIView(generics.ListAPIView):
     def format_time(self, seconds):
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
-        return f"{hours:02d}:{minutes:02d}"
+        return f"{int(hours):02d}:{int(minutes):02d}"
 
 
 class TodayAttendanceView(APIView):
@@ -361,27 +363,14 @@ class TodayAttendanceView(APIView):
     def get(self, request):
         user = request.user
         today = timezone.localdate()
+        qs = Attendance.objects.filter(date=today)
 
         if user.role == "employee":
-            qs = Attendance.objects.filter(
-                user=user,
-                date=today
-            )
+            qs = qs.filter(user=user)
 
-        elif user.role == "tl":
-            qs = Attendance.objects.filter(
-                date=today,
-                user__role="employee"
-            ).exclude(
-                user__role__in=["tl", "hr"]
-            )
-
-        elif user.role == "hr":
-            qs = Attendance.objects.filter(
-                date=today,
-                user__role="employee"
-            ).exclude(
-                user__role__in=["tl", "hr"]
+        elif user.role in ['tl', 'hr']:
+            qs = qs.filter(
+                Q(user=user) | Q(user__role="employee")
             )
 
         else:
