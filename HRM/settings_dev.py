@@ -10,7 +10,7 @@ CORS_ALLOW_CREDENTIALS = False
 
 MEDIA_ROOT = BASE_DIR / "media"
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend' 
 
 # DATABASES = {
 #     'default': {
