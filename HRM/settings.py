@@ -6,16 +6,12 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 SECRET_KEY = os.environ.get(
     "SECRET_KEY", "django-insecure-ii-#!%hvxy_3rcdes57n&x+oak$&b1u22r&)%z!=%fy0-6g!h@")
 
-
 DEBUG = False
 
-
 ALLOWED_HOSTS = []
-
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -32,7 +28,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
-    'hr', 'emp', 'tl', 'login', 'management',
+    'hr', 'emp', 'tl', 'login', 'management', 'projects',
 ]
 
 
@@ -52,7 +48,6 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'HRM.urls'
 
 WSGI_APPLICATION = 'HRM.wsgi.application'
-
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -78,6 +73,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
+
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
@@ -88,6 +84,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'HRM REST API',
     'VERSION': '1.0.0',
 }
+
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
@@ -141,6 +138,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
 AUTH_USER_MODEL = 'login.User'
 
 LANGUAGE_CODE = 'en-us'
@@ -150,6 +148,7 @@ TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 
 USE_TZ = True
+
 
 STATIC_URL = '/static/'
 
@@ -175,13 +174,19 @@ except Exception:
 
     STATICFILES_STORAGE = None
 
+
 MEDIA_URL = "/media/"
+
 MEDIA_ROOT = BASE_DIR / "media/"
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
 CORS_ALLOW_ALL_ORIGINS = False
+
 CORS_ALLOWED_ORIGINS = []
+
 CORS_ALLOW_CREDENTIALS = False
 
 CORS_ALLOW_HEADERS = [
@@ -193,6 +198,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+
 CORS_ALLOW_METHODS = [
     'GET',
     'POST',
@@ -202,20 +208,27 @@ CORS_ALLOW_METHODS = [
     'OPTIONS',
 ]
 
+
 CSRF_TRUSTED_ORIGINS = []
 
+
 APPEND_SLASH = False
+
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = 'smtp.gmail.com'
+
 EMAIL_PORT = 587
+
 EMAIL_USE_TLS = True
 
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 LOGGING = {
     'version': 1,

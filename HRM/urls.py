@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/', include('tl.urls')),
     path('api/', include('login.urls')),
     path('api/', include('management.urls')),
+    path('api/', include('projects.urls')),
 ]
 
 urlpatterns += [
