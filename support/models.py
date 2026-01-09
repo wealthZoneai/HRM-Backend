@@ -3,6 +3,7 @@ from django.conf import settings
 
 User = settings.AUTH_USER_MODEL
 
+
 class SupportTicket(models.Model):
     CATEGORY_CHOICES = [
         ('HR', 'HR'),
@@ -52,6 +53,7 @@ class SupportTicket(models.Model):
     def __str__(self):
         return f"#{self.id} {self.subject}"
 
+
 class SupportMessage(models.Model):
     ticket = models.ForeignKey(
         SupportTicket,
@@ -70,13 +72,6 @@ class SupportMessage(models.Model):
     class Meta:
         ordering = ['created_at']
 
-class LoginSupportTicket(models.Model):
-    email_or_empid = models.CharField(max_length=150)
-    issue_type = models.CharField(max_length=100)
-    message = models.TextField(blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    resolved = models.BooleanField(default=False)
 
 class LoginSupportTicket(models.Model):
     ISSUE_CHOICES = [
