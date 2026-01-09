@@ -71,6 +71,6 @@ urlpatterns = [
     path('leaves/<int:leave_id>/action/',
          views.HRLeaveActionAPIView.as_view(), name='hr-leave-action'),
 
-    path('leave-dashboard/stats/', views.HRLeaveDashboardsStatsAPIView.as_view(),
+    path('leave-dashboard/stats/', views.HRLeaveDashboardStatsAPIView.as_view(),
          name='hr-leave-dashboard-stats'),
 ]
