@@ -808,6 +808,14 @@ class TimesheetEntrySerializer(serializers.ModelSerializer):
     def get_end_time(self, obj):
         return timezone.localtime(obj.end_time) if obj.end_time else None
 
+    def validate_project_task(self, task):
+        request = self.context.get('request')
+        if task and task.assigned_to != request.user:
+            raise serializers.ValidationError(
+                "You can log time only for your own task."
+            )
+        return task
+
 
 class TimesheetDaySerializer(serializers.ModelSerializer):
     class Meta:

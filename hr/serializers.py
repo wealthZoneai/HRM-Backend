@@ -111,6 +111,10 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 class AttendanceAdminSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
+    department = serializers.CharField(
+        source='user.employeeprofile.department',
+        read_only=True
+    )
 
     class Meta:
         model = Attendance

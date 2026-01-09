@@ -99,7 +99,6 @@ class EmployeeProfile(models.Model):
 
     job_title = models.CharField(max_length=150, null=True, blank=True)
 
-
     department = models.CharField(
         max_length=100, choices=EMPLOYEE_DEPARTMENT_CHOICES, blank=True, null=True)
 
@@ -602,6 +601,13 @@ class TimesheetEntry(models.Model):
     manual = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    project_task = models.ForeignKey(
+        'projects.Task',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='timesheet_entries'
+    )
 
     class Meta:
         ordering = ['date', 'start_time']

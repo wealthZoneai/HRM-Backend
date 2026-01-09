@@ -2,17 +2,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-
+from .models import Project, ProjectModule, Task, SubTask, ProjectAudit
 from emp.models import Notification
 from .serializers import (ProjectStatusUpdateSerializer, ModuleStatusUpdateSerializer,
-                          TaskStatusUpdateSerializer, SubTaskStatusUpdateSerializer)
+                          TaskStatusUpdateSerializer, SubTaskStatusUpdateSerializer,
+                          ProjectReadSerializer)
 
 from .models import Project, ProjectModule, Task, SubTask
 from .serializers import (
     ProjectSerializer, ProjectModuleSerializer,
-    TaskSerializer, SubTaskSerializer
-)
+    TaskSerializer, SubTaskSerializer)
 from .permissions import IsDM, IsPM, IsTL, IsEmployee
+from emp.permissions import IsHROrManagement
 
 
 class DMCreateProjectAPIView(APIView):
@@ -73,38 +74,37 @@ class ProjectStatusUpdateAPIView(APIView):
 
     def post(self, request, project_id):
         project = get_object_or_404(Project, id=project_id)
-        ser = ProjectStatusUpdateSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        new_status = ser.validated_data['status']
 
-        role = request.user.role
+        serializer = ProjectStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if new_status in ('completed', 'closed') and role != 'management':
-            return Response({"detail": "Only Delivery Manager allowed"}, status=403)
+        new_status = serializer.validated_data['status']
+        user_role = request.user.role
 
-        if new_status in ('in_progress', 'at_risk') and role != 'pm':
-            return Response({"detail": "Only PM allowed"}, status=403)
+        if new_status in ('completed', 'closed') and user_role != 'management':
+            return Response({"detail": "Only Delivery Manager can do this"}, status=403)
+
+        if new_status in ('in_progress', 'at_risk') and user_role != 'pm':
+            return Response({"detail": "Only Project Manager can do this"}, status=403)
+
+        old_status = project.status
 
         project.status = new_status
         project.save(update_fields=['status'])
 
-        # 🔔 Notify stakeholders
-        recipients = filter(
-            None,
-            [project.delivery_manager, project.project_manager]
+        ProjectAudit.objects.create(
+            project=project,
+            actor=request.user,
+            action='project_status',
+            old_value=old_status,
+            new_value=new_status
         )
 
-        Notification.objects.bulk_create([
-            Notification(
-                to_user=u,
-                title=f"Project status updated: {project.name}",
-                body=f"Status changed to {new_status}",
-                notif_type="project"
-            )
-            for u in recipients if u != request.user
-        ])
-
-        return Response({"status": project.status})
+        return Response({
+            "project_id": project.id,
+            "old_status": old_status,
+            "new_status": new_status
+        }, status=200)
 
 
 class ModuleStatusUpdateAPIView(APIView):
@@ -112,29 +112,35 @@ class ModuleStatusUpdateAPIView(APIView):
 
     def post(self, request, module_id):
         module = get_object_or_404(ProjectModule, id=module_id)
-        ser = ModuleStatusUpdateSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        new_status = ser.validated_data['status']
 
-        role = request.user.role
+        serializer = ModuleStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data['status']
 
-        if new_status in ('in_progress', 'blocked', 'completed') and role != 'tl':
+        if new_status in ('in_progress', 'blocked', 'completed') and request.user.role != 'tl':
             return Response({"detail": "Only TL allowed"}, status=403)
 
-        if new_status == 'returned' and role != 'pm':
+        if new_status == 'returned' and request.user.role != 'pm':
             return Response({"detail": "Only PM allowed"}, status=403)
+
+        old_status = module.status
 
         module.status = new_status
         module.save(update_fields=['status'])
 
-        Notification.objects.create(
-            to_user=module.project.project_manager,
-            title=f"Module update: {module.name}",
-            body=f"Module marked {new_status}",
-            notif_type="project"
+        ProjectAudit.objects.create(
+            project=module.project,
+            actor=request.user,
+            action='module_status',
+            old_value=old_status,
+            new_value=new_status
         )
 
-        return Response({"status": module.status})
+        return Response({
+            "module_id": module.id,
+            "old_status": old_status,
+            "new_status": new_status
+        })
 
 
 class TaskStatusUpdateAPIView(APIView):
@@ -142,29 +148,35 @@ class TaskStatusUpdateAPIView(APIView):
 
     def post(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
-        ser = TaskStatusUpdateSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        new_status = ser.validated_data['status']
 
-        role = request.user.role
+        serializer = TaskStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data['status']
 
-        if new_status == 'review' and role not in ('employee', 'intern'):
-            return Response({"detail": "Employee only"}, status=403)
+        if new_status == 'review' and request.user != task.assigned_to:
+            return Response({"detail": "Only assignee can submit for review"}, status=403)
 
-        if new_status in ('rework', 'completed') and role != 'tl':
-            return Response({"detail": "TL only"}, status=403)
+        if new_status in ('rework', 'completed') and request.user.role != 'tl':
+            return Response({"detail": "Only TL allowed"}, status=403)
+
+        old_status = task.status
 
         task.status = new_status
         task.save(update_fields=['status'])
 
-        Notification.objects.create(
-            to_user=task.created_by,
-            title=f"Task update: {task.title}",
-            body=f"Task status changed to {new_status}",
-            notif_type="project"
+        ProjectAudit.objects.create(
+            project=task.module.project,
+            actor=request.user,
+            action='task_status',
+            old_value=old_status,
+            new_value=new_status
         )
 
-        return Response({"status": task.status})
+        return Response({
+            "task_id": task.id,
+            "old_status": old_status,
+            "new_status": new_status
+        })
 
 
 class SubTaskStatusUpdateAPIView(APIView):
@@ -198,6 +210,7 @@ class SubTaskStatusUpdateAPIView(APIView):
 
         return Response({"status": subtask.status})
 
+
 class DMDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDM]
 
@@ -210,6 +223,7 @@ class DMDashboardAPIView(APIView):
             "at_risk": qs.filter(status='at_risk').count(),
             "completed": qs.filter(status='completed').count(),
         })
+
 
 class PMDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated, IsPM]
@@ -225,6 +239,7 @@ class PMDashboardAPIView(APIView):
             "completed": modules.filter(status='completed').count(),
         })
 
+
 class TLDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
 
@@ -235,4 +250,35 @@ class TLDashboardAPIView(APIView):
             "assigned_tasks": tasks.count(),
             "pending_review": tasks.filter(status='review').count(),
             "completed": tasks.filter(status='completed').count(),
+        })
+
+
+class ProjectHierarchyAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        project = get_object_or_404(Project, id=project_id)
+
+        # Visibility rules
+        user = request.user
+        if user.role == 'employee':
+            if not Task.objects.filter(
+                module__project=project,
+                assigned_to=user
+            ).exists():
+                return Response({"detail": "Not allowed"}, status=403)
+
+        serializer = ProjectReadSerializer(project)
+        return Response(serializer.data)
+
+
+class HRProjectAnalyticsAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsHROrManagement]
+
+    def get(self, request):
+        return Response({
+            "projects_total": Project.objects.count(),
+            "in_progress": Project.objects.filter(status='in_progress').count(),
+            "at_risk": Project.objects.filter(status='at_risk').count(),
+            "completed": Project.objects.filter(status='completed').count(),
         })

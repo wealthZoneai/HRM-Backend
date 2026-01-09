@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
-    'hr', 'emp', 'tl', 'login', 'management', 'projects',
+    'hr', 'emp', 'tl', 'login', 'management', 'projects','support',
 ]
 
 

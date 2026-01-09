@@ -31,4 +31,9 @@ urlpatterns = [
     path("dashboard/pm/", views.PMDashboardAPIView.as_view()),
 
     path("dashboard/tl/", views.TLDashboardAPIView.as_view()),
+
+    path("project/<int:project_id>/tree/",
+         views.ProjectHierarchyAPIView.as_view()),
+
+    path("analytics/hr/", views.HRProjectAnalyticsAPIView.as_view()),
 ]

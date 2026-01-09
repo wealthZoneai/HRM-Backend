@@ -51,3 +51,33 @@ class SubTaskStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=['in_progress', 'completed', 'rejected']
     )
+
+
+class SubTaskReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubTask
+        fields = ('id', 'title', 'status', 'created_by', 'approved_by_tl')
+
+
+class TaskReadSerializer(serializers.ModelSerializer):
+    subtasks = SubTaskReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Task
+        fields = ('id', 'title', 'status', 'assigned_to', 'subtasks')
+
+
+class ModuleReadSerializer(serializers.ModelSerializer):
+    tasks = TaskReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProjectModule
+        fields = ('id', 'name', 'status', 'team_lead', 'tasks')
+
+
+class ProjectReadSerializer(serializers.ModelSerializer):
+    modules = ModuleReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Project
+        fields = ('id', 'name', 'status', 'project_manager', 'modules')

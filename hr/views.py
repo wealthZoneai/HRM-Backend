@@ -66,15 +66,24 @@ class HRAttendanceListAPIView(generics.ListAPIView):
     def get_queryset(self):
         user_id = self.request.query_params.get('user_id')
         month = self.request.query_params.get('month')
-        qs = Attendance.objects.all().select_related('user')
+        department = self.request.query_params.get('department')
+        qs = Attendance.objects.all().select_related(
+            'user',
+            'user__employeeprofile'
+        )
         if user_id:
             qs = qs.filter(user__id=user_id)
+
+        if department:
+            qs = qs.filter(
+                user__employeeprofile__department__iexact=department
+            )
+
         if month:
             try:
                 y, m = map(int, month.split('-'))
                 qs = qs.filter(date__year=y, date__month=m)
             except (ValueError, AttributeError):
-                # ignore bad format and return unfiltered by month
                 pass
 
         return qs.order_by('-date')

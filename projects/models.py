@@ -125,3 +125,36 @@ class SubTask(models.Model):
         User, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='approved_subtasks'
     )
+
+
+class ProjectAudit(models.Model):
+    ACTION_CHOICES = [
+        ('project_status', 'Project Status Change'),
+        ('module_status', 'Module Status Change'),
+        ('task_status', 'Task Status Change'),
+    ]
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True
+    )
+
+    action = models.CharField(
+        max_length=30,
+        choices=ACTION_CHOICES
+    )
+
+    old_value = models.CharField(max_length=50)
+    new_value = models.CharField(max_length=50)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.project.name} | {self.action} | {self.old_value} → {self.new_value}"
