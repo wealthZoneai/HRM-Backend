@@ -1607,43 +1607,88 @@ class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class HRDashboardStatsAPIView(APIView):
+    """
+    HR / Management dashboard statistics.
+
+    Provides:
+    - Today's workforce snapshot
+    - Monthly attendance & leave summary
+    """
+
     permission_classes = [IsHROrManagement]
 
     def get(self, request):
         today = timezone.localdate()
 
-        # 1. Total Active Employees
-        total_employees = EmployeeProfile.objects.filter(
-            is_active=True).count()
+        month_q = request.query_params.get("month")
+        if month_q:
+            try:
+                year, month = map(int, month_q.split("-"))
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid month format. Use YYYY-MM."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            year, month = today.year, today.month
 
-        # 2. Present Employees (Clocked in today)
-        present_employees = Attendance.objects.filter(
-            date=today
-        ).exclude(status='absent').count()
+        workforce_roles = ["employee", "intern", "tl"]
 
-        # 3. On Leave Employees (Approved leaves active today)
-        on_leave_employees = models.LeaveRequest.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today,
-            status__in=['hr_approved', 'tl_approved']
+        total_employees = User.objects.filter(
+            role__in=workforce_roles,
+            is_active=True
         ).count()
 
-        workforce_roles = ['employee', 'intern', 'tl']
-        total_employees = User.objects.filter(
-            role__in=workforce_roles, is_active=True).count()
-
-        # Present Today
         present_today = Attendance.objects.filter(
             date=today,
             user__role__in=workforce_roles,
-            status__in=['Working', 'Completed']
-        ).values('user').distinct().count()
+            status__in=["working", "completed"]
+        ).values("user").distinct().count()
 
-        # On Leave (Total - Present)
-        on_leave = max(0, total_employees - present_today)
+        on_leave_today = models.LeaveRequest.objects.filter(
+            start_date__lte=today,
+            end_date__gte=today,
+            status="hr_approved"
+        ).count()
 
-        return Response({
-            "total_employees": total_employees,
-            "present_employees": present_employees,
-            "on_leave_employees": on_leave_employees
-        })
+        monthly_attendance_qs = Attendance.objects.filter(
+            date__year=year,
+            date__month=month,
+            user__role__in=workforce_roles,
+            status="completed"
+        )
+
+        attendance_entries = monthly_attendance_qs.count()
+
+        total_work_seconds = (
+            monthly_attendance_qs.aggregate(
+                total=Sum("duration_seconds")
+            )["total"] or 0
+        )
+
+        total_work_hours = round(total_work_seconds / 3600.0, 2)
+
+        approved_leaves = models.LeaveRequest.objects.filter(
+            start_date__year=year,
+            start_date__month=month,
+            status="hr_approved"
+        ).count()
+
+        return Response(
+            {
+                "today_summary": {
+                    "date": today.isoformat(),
+                    "total_employees": total_employees,
+                    "present_today": present_today,
+                    "on_leave_today": on_leave_today
+                },
+                "monthly_summary": {
+                    "year": year,
+                    "month": f"{year}-{month:02d}",
+                    "attendance_entries": attendance_entries,
+                    "total_work_hours": total_work_hours,
+                    "approved_leaves": approved_leaves
+                }
+            },
+            status=status.HTTP_200_OK
+        )
