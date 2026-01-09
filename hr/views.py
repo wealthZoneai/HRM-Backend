@@ -537,35 +537,6 @@ class HRLeaveActionAPIView(APIView):
             )
 
 
-class HRDashboardStatsAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsHR]
-
-    def get(self, request):
-        today = timezone.localdate()
-
-        # 1. Total Active Employees
-        total_employees = EmployeeProfile.objects.filter(
-            is_active=True).count()
-
-        # 2. Present Employees (Clocked in today)
-        present_employees = Attendance.objects.filter(
-            date=today
-        ).exclude(status='absent').count()
-
-        # 3. On Leave Employees (Approved leaves active today)
-        on_leave_employees = LeaveRequest.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today,
-            status__in=['hr_approved', 'tl_approved']
-        ).count()
-
-        return Response({
-            "total_employees": total_employees,
-            "present_employees": present_employees,
-            "on_leave_employees": on_leave_employees
-        })
-
-
 class HRLeaveDashboardStatsAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
 

@@ -9,7 +9,7 @@ LEAVE_TYPE_CHOICES = [
 
 EMPLOYEE_DEPARTMENT_CHOICES = [
     ("Python", "Python"),
-    ("Testing", "Testing"),
+    ("QA", "QA"),
     ("Java", "Java"),
     ("UI/UX", "UI/UX"),
     ("React", "React"),
