@@ -18,6 +18,8 @@ class Announcement(models.Model):
     description = models.TextField()
     date = models.DateField()
     time = models.TimeField()
+    department = models.CharField(max_length=50)
+    location = models.CharField(max_length=255, blank=True, null=True)
     audience = models.CharField(max_length=50, choices=ANNOUNCEMENT_AUDIENCE_CHOICES)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     created_by = models.ForeignKey(

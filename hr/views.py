@@ -566,3 +566,72 @@ class HRLeaveActionAPIView(APIView):
                     "detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class HRDashboardStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsHR]
+
+    def get(self, request):
+        today = timezone.localdate()
+
+        # 1. Total Active Employees
+        total_employees = EmployeeProfile.objects.filter(
+            is_active=True).count()
+
+        # 2. Present Employees (Clocked in today)
+        present_employees = Attendance.objects.filter(
+            date=today
+        ).exclude(status='absent').count()
+
+        # 3. On Leave Employees (Approved leaves active today)
+        on_leave_employees = LeaveRequest.objects.filter(
+            start_date__lte=today,
+            end_date__gte=today,
+            status__in=['hr_approved', 'tl_approved']
+        ).count()
+
+        return Response({
+            "total_employees": total_employees,
+            "present_employees": present_employees,
+            "on_leave_employees": on_leave_employees
+        })
+
+
+class HRLeaveDashboardStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsHR]
+
+    def get(self, request):
+        today = timezone.localdate()
+
+        # 1. Total Active Employees
+        total_employees = EmployeeProfile.objects.filter(
+            is_active=True).count()
+
+        # 2. Present Employees (Clocked in today)
+        present_employees = Attendance.objects.filter(
+            date=today
+        ).exclude(status='absent').count()
+
+        # 3. On Leave Employees (Approved leaves active today)
+        # Note: This is used to calculate absent employees
+        on_leave_employees = LeaveRequest.objects.filter(
+            start_date__lte=today,
+            end_date__gte=today,
+            status__in=['hr_approved', 'tl_approved']
+        ).count()
+
+        # 4. Absent Employees (Total - Present - On Leave)
+        absent_employees = total_employees - present_employees - on_leave_employees
+        if absent_employees < 0:
+            absent_employees = 0
+
+        # 5. Pending Leave Requests (Awaiting HR action)
+        pending_leaves = LeaveRequest.objects.filter(
+            status__in=['applied', 'tl_approved']
+        ).count()
+
+        return Response({
+            "present_today": present_employees,
+            "absent_today": absent_employees,
+            "leave_requests": pending_leaves
+        })

@@ -932,6 +932,7 @@ class TimesheetDailyFormAPIView(APIView):
             "clock_out": clock_out,
             "existing_entries": entries_ser,
             "total_hours_workdone": total_hours,
+            "duration_seconds": total_seconds,
         }, status=200)
 
 

@@ -321,6 +321,8 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         return self.mask_number(obj.account_number)
 
     def get_protected_profile_photo_url(self, obj):
+        if not obj.profile_photo:
+            return None
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
@@ -366,6 +368,8 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
         return url
 
     def get_protected_id_image_url(self, obj):
+        if not obj.id_image:
+            return None
         request = self.context.get("request", None)
         try:
             url = reverse("protected_employee_media",
