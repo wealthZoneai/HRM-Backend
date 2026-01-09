@@ -211,47 +211,6 @@ class TeamLeadListAPIView(APIView):
         return Response(ser.data)
 
 
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated, IsTL])
-def tl_create_announcement(request):
-    serializer = TLAnnouncementSerializer(data=request.data)
-
-    if serializer.is_valid():
-        try:
-            announcement = serializer.save(
-                created_by=request.user,
-                created_role='TL'
-            )
-        except IntegrityError:
-            return Response({
-                "success": False,
-                "errors": "An announcement already exists at this date and time."
-            }, status=400)
-
-        employees = EmployeeProfile.objects.filter(
-            team_lead=request.user,
-            is_active=True
-        ).select_related('user')
-
-        Notification.objects.bulk_create([
-            Notification(
-                to_user=emp.user,
-                title=announcement.title,
-                body=announcement.description,
-                notif_type='announcement'
-            )
-            for emp in employees
-        ])
-
-        return Response({
-            "success": True,
-            "message": "Announcement sent to team"
-        })
-
-    return Response(serializer.errors, status=400)
-
-
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsTL])

@@ -176,37 +176,6 @@ class HRCalendarDeleteAPIView(generics.DestroyAPIView):
     queryset = CalendarEvent.objects.all()
 
 
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated, IsHR])
-def create_announcement(request):
-    serializer = AnnouncementSerializer(data=request.data)
-    if serializer.is_valid():
-        try:
-            announcement = serializer.save(created_by=request.user)
-
-            if announcement.show_in_calendar:
-                CalendarEvent.objects.create(
-                    title=announcement.title,
-                    description=announcement.description,
-                    event_type="announcement",
-                    date=announcement.date,
-                    start_time=announcement.time,
-                    created_by=request.user,
-                    extra={"announcement_id": announcement.id, "source": "HR"}
-                )
-            return Response({"success": True, "message": "Announcement created successfully"})
-
-        except IntegrityError:
-            return Response(
-                {"success": False,
-                    "errors": "An announcement already exists at this date and time."},
-                status=400
-            )
-
-    return Response(serializer.errors, status=400)
-
-
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
