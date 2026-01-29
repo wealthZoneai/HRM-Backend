@@ -529,10 +529,10 @@ class LeaveRequest(models.Model):
 
 class Policy(models.Model):
     POLICY_TYPES = [
-        ('policy', 'Policy'),
-        ('terms', 'Terms'),
-        ('resignation', 'Resignation'),
-        ('termination', 'Termination'),
+        ('policy', 'Company Policy'),
+        ('terms', 'Terms & Conditions'),
+        ('resignation', 'Resignation Rules'),
+        ('separation', 'Separation Rules'),
     ]
     title = models.CharField(max_length=250)
     policy_type = models.CharField(

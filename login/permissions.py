@@ -22,6 +22,14 @@ class IsManagement(RolePermission):
     required_role = "management"
 
 
+class IsDM(RolePermission):
+    required_role = "dm"
+
+
+class IsPM(RolePermission):
+    required_role = "pm"
+
+
 class IsHR(RolePermission):
     required_role = "hr"
 

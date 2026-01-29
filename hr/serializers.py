@@ -220,23 +220,31 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         date = attrs.get('date')
         time = attrs.get('time')
 
-        # ✅ 1. Prevent past date
-        today = timezone.localdate()
-        if date < today:
-            raise serializers.ValidationError(
-                "Past dates are not allowed."
-            )
-
-        # ✅ 2. Prevent past time for today
-        if date == today:
-            current_time = timezone.localtime().time()
-            if time <= current_time:
+        if self.instance:
+            pass
+        else:
+            # ✅ 1. Prevent past date
+            today = timezone.localdate()
+            if date < today:
                 raise serializers.ValidationError(
-                    "Past time is not allowed for today's date."
+                    "Past dates are not allowed."
                 )
 
+            # ✅ 2. Prevent past time for today
+            if date == today:
+                current_time = timezone.localtime().time()
+                if time <= current_time:
+                    raise serializers.ValidationError(
+                        "Past time is not allowed for today's date."
+                    )
+
         # ✅ 3. Prevent duplicate date + time
-        if Announcement.objects.filter(date=date, time=time).exists():
+        qs = Announcement.objects.filter(date=date, time=time)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+    
+        if qs.exists():
             raise serializers.ValidationError(
                 "An announcement already exists at this date and time."
             )

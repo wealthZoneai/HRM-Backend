@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveBalance, Notification
 from . import serializers
 from .permissions import IsHR, IsTL
+from projects.permissions import IsDM, IsPM
 from django.db.models import Sum, Count
 from django.utils import timezone
 import calendar
@@ -41,9 +42,15 @@ class HRUpdateEmployeeRoleAPIView(generics.UpdateAPIView):
 
 
 class HRListEmployeesAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsHR]
+    permission_classes = [IsAuthenticated, IsHR | IsDM | IsPM]
     serializer_class = serializers.EmployeeListSerializer
-    queryset = EmployeeProfile.objects.all().select_related('user')
+
+    def get_queryset(self):
+        qs = EmployeeProfile.objects.all().select_related('user')
+        role = self.request.query_params.get('role')
+        if role:
+            qs = qs.filter(user__role__iexact=role)
+        return qs
 
 
 class HRRetrieveEmployeeAPIView(generics.RetrieveAPIView):
@@ -202,7 +209,6 @@ def update_announcement(request, pk):
     if serializer.is_valid():
         announcement = serializer.save()
 
-        employees = User.objects.filter(role__iexact="employee")
         employees = User.objects.filter(employeeprofile__isnull=False)
 
         for emp in employees:
@@ -215,6 +221,8 @@ def update_announcement(request, pk):
             )
 
         return Response({"success": True, "data": serializer.data})
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['DELETE'])
@@ -229,7 +237,6 @@ def delete_announcement(request, pk):
     title = announce.title
     announce.delete()
 
-    employees = User.objects.filter(role__iexact="employee")
     employees = User.objects.filter(employeeprofile__isnull=False)
 
     for emp in employees:

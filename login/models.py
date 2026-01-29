@@ -8,6 +8,8 @@ import datetime
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('management', 'Management'),
+        ('dm', 'Delivery Manager'),
+        ('pm', 'Project Manager'),
         ('hr', 'HR'),
         ('tl', 'Team Leader'),
         ('employee', 'Employee'),

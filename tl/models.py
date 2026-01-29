@@ -26,3 +26,11 @@ class TLAnnouncement(models.Model):
 
     def __str__(self):
         return self.title
+
+class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            fields=['date', 'time'],
+            name='unique_announcement_datetime'
+        )
+    ]

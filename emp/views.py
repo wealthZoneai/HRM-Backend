@@ -403,8 +403,31 @@ class CalendarEventsAPIView(generics.ListAPIView):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def emp_all_announcements(request):
+    user = request.user
+
     announcements = Announcement.objects.all().order_by('-date')
+    hr_announcements = Announcement.objects.all()
+    
     serializer = AnnouncementSerializer(announcements, many=True)
+    
+    try:
+        profile = EmployeeProfile.objects.select_related("team_lead").get(user=user)
+        tl_announcements = TLAnnouncement.objects.filter(
+            created_by=profile.team_lead
+        )
+    except EmployeeProfile.DoesNotExist:
+        tl_announcements = TLAnnouncement.objects.none()
+
+    data = []
+    data.extend(AnnouncementSerializer(hr_announcements, many=True).data)
+    data.extend(TLAnnouncementSerializer(tl_announcements, many=True).data)
+
+    data = sorted(
+        data,
+        key=lambda x: (x["date"], x["time"]),
+        reverse=True
+    )
+    
     return Response({
         "success": True,
         "data": serializer.data
@@ -415,6 +438,9 @@ def emp_all_announcements(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def emp_notifications(request):
+    """
+    Get all notifications for the logged-in employee, newest first
+    """
     notifications = Notification.objects.filter(
         to_user=request.user
     ).order_by('-created_at')
@@ -430,6 +456,9 @@ def emp_notifications(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def mark_notifications_read(request):
+    """
+    Mark all unread notifications as read
+    """
     Notification.objects.filter(
         to_user=request.user,
         is_read=False
@@ -445,7 +474,12 @@ def mark_notifications_read(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def emp_tl_announcements(request):
-    profile = EmployeeProfile.objects.get(user=request.user)
+    try:
+        profile = EmployeeProfile.objects.select_related("team_lead").get(
+            user=request.user
+        )
+    except EmployeeProfile.DoesNotExist:
+        return Response({"success": True, "data":[]})
 
     if not profile.team_lead:
         return Response({
@@ -455,7 +489,7 @@ def emp_tl_announcements(request):
 
     announcements = TLAnnouncement.objects.filter(
         created_by=profile.team_lead
-    ).order_by('-date')
+    ).order_by('-date', '-time')
 
     serializer = TLAnnouncementSerializer(announcements, many=True)
 
@@ -1565,6 +1599,19 @@ class PolicyCreateAPIView(generics.CreateAPIView):
                 notif_type='policy',
                 is_read=False
             )
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "policy created successfully"
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 
 class PolicyRetrieveAPIView(generics.RetrieveAPIView):
@@ -1573,7 +1620,7 @@ class PolicyRetrieveAPIView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
+class PolicyUpdateAPIView(generics.UpdateAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
     permission_classes = [IsHROrManagement]
@@ -1591,6 +1638,29 @@ class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
                 is_read=False
             )
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Policy updated successfully"
+            },
+            status=status.HTTP_200_OK
+        )
+
+class PolicyDeleteAPIView(generics.DestroyAPIView):
+    queryset = models.Policy.objects.all()
+    serializer_class = serializers.PolicySerializer
+    permission_classes = [IsHROrManagement]
+
     def perform_destroy(self, instance):
         policy_title = instance.title
         instance.delete()
@@ -1604,7 +1674,20 @@ class PolicyUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
                 notif_type='policy',
                 is_read=False
             )
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        policy_title = instance.title
 
+        self.perform_destroy(instance)
+
+        return Response(
+            {
+                "status": "success",
+                "message": f"policy '{policy_tite}' deleted successfully"
+            },
+            status=status.HTTP_200_OK
+        )
 
 class HRDashboardStatsAPIView(APIView):
     permission_classes = [IsHROrManagement]

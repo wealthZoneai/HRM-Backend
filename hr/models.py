@@ -136,3 +136,11 @@ class Payslip(models.Model):
 
     def __str__(self):
         return f"HR Payslip: {self.profile.user.username} - {self.month}/{self.year}"
+
+class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            fields=['date', 'time'],
+            name='unique_hr_announcement_datetime'
+        )
+    ]

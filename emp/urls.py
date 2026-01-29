@@ -50,8 +50,11 @@ urlpatterns = [
 
     path('policy/create/', views.PolicyCreateAPIView.as_view(), name='policy-create'),
 
-    path('policy/<int:pk>/', views.PolicyUpdateDeleteAPIView.as_view(),
-         name='policy-detail'),
+    path('policy/update/<int:pk>/',
+         views.PolicyUpdateAPIView.as_view(), name='policy-update'),
+
+    path('policy/delete/<int:pk>/',
+         views.PolicyDeleteAPIView.as_view(), name='policy-delete'),
 
     path("announcements/", views.emp_all_announcements,
          name="emp_all_announcements"),

@@ -307,9 +307,39 @@ def tl_create_announcement(request):
             for emp in employees
         ])
 
+        response_serializer = TLAnnouncementSerializer(announcement)
+
         return Response({
             "success": True,
-            "message": "TL announcement created"
+            "message": "TL announcement created",
+            "data": response_serializer.data
         }, status=201)
 
     return Response(serializer.errors, status=400)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def list_announcements(request):
+    user = request.user
+
+    if user.role == 'tl':
+        announcements = TLAnnouncement.objects.filter(
+            created_by=user
+        ).order_by("-date")
+
+    else:
+        try:
+            profile = EmployeeProfile.objects.get(user.user)
+            announcements = TLAnnouncement.objects.filter(
+                created_by=profile.team_lead
+            ).order_by("-date")
+        except EmployeeProfile.DoesNotExist:
+            announcements = TLAnnouncement.objects.none()
+    
+    serializer = TLAnnouncementSerializer(announcements, many=True)
+
+    return Response({
+        "success": True,
+        "data": serializer.data
+    })

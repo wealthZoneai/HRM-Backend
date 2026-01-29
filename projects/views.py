@@ -4,14 +4,16 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Project, ProjectModule, Task, SubTask, ProjectAudit
 from emp.models import Notification
+from django.db.models import Count, Q
+from django.contrib.auth import get_user_model
 from .serializers import (ProjectStatusUpdateSerializer, ModuleStatusUpdateSerializer,
                           TaskStatusUpdateSerializer, SubTaskStatusUpdateSerializer,
-                          ProjectReadSerializer)
+                          ProjectReadSerializer, ModuleReadSerializer, TaskReadSerializer, AssignPMSerializer)
 
 from .models import Project, ProjectModule, Task, SubTask
 from .serializers import (
     ProjectSerializer, ProjectModuleSerializer,
-    TaskSerializer, SubTaskSerializer)
+    TaskSerializer, SubTaskSerializer, EmployeeProjectStatusSerializer)
 from .permissions import IsDM, IsPM, IsTL, IsEmployee
 from emp.permissions import IsHROrManagement
 
@@ -20,10 +22,32 @@ class DMCreateProjectAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDM]
 
     def post(self, request):
+        print(
+            f"DEBUG: DMCreateProjectAPIView hit by User: {request.user}, Role:{request.user.role}")
         ser = ProjectSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         project = ser.save(delivery_manager=request.user)
         return Response(ProjectSerializer(project).data, status=201)
+
+
+class DMAssignPMAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsDM]
+
+    def post(self, request, project_id):
+        project = get_object_or_404(project, id=project_id)
+        serializer = AssignPMSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        pm_id = serializer.vlidated_data['project_manager']
+        User = get_user_model()
+        pm_user = get_object_or_404(User, id=pm_id)
+
+        try:
+            project.assign_pm(pm_user)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
+        return Response(ProjectSerializer(project).data)
 
 
 class PMCreateModuleAPIView(APIView):
@@ -275,10 +299,83 @@ class ProjectHierarchyAPIView(APIView):
 class HRProjectAnalyticsAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHROrManagement]
 
+    # def get(self, request):
+    #     return Response({
+    #         "projects_total": Project.objects.count(),
+    #         "in_progress": Project.objects.filter(status='in_progress').count(),
+    #         "at_risk": Project.objects.filter(status='at_risk').count(),
+    #         "completed": Project.objects.filter(status='completed').count(),
+    #     })
+
+
+class DMProjectListAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsDM]
+
     def get(self, request):
-        return Response({
-            "projects_total": Project.objects.count(),
-            "in_progress": Project.objects.filter(status='in_progress').count(),
-            "at_risk": Project.objects.filter(status='at_risk').count(),
-            "completed": Project.objects.filter(status='completed').count(),
-        })
+        projects = Project.objects.all().order_by('-created_at')
+        serializer = ProjectReadSerializer(projects, many=True)
+        return Response(serializer.data)
+
+
+class PMProjectListAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsPM]
+
+    def get(self, request):
+        projects = Project.objects.filter(project_manager=request.user)
+        serializer = ProjectReadSerializer(projects, many=True)
+        return Response(serializer.data)
+
+
+class TLModuleListAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsTL]
+
+    def get(self, request):
+        modules = ProjectModule.objects.filter(team_lead=request.user)
+        serializer = ModuleReadSerializer(modules, many=True)
+        return Response(serializer.data)
+
+
+class EmployeeTaskListAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsEmployee]
+
+    def get(self, request):
+        tasks = Task.objects.filter(assigned_to=request.user)
+        serializer = TaskReadSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+
+class EmployeeProjectStatusAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsEmployee]
+
+    def get(self, request):
+        tasks = Task.objectsfilter(assigned_to=request.user).select_related(
+            'module__project'
+        )
+
+        project_data = {}
+        for task in tasks:
+            project = task.module.project
+            project_id = project.id
+
+            if project_id not in project_data:
+                project_data[project_id] = {
+                    'project_id': project_id,
+                    'project_name': project.name,
+                    'total_tasks': 0,
+                    'completed_tasks': 0,
+                    'in_progress_tasks': 0,
+                    'todo_tasks': 0,
+                }
+
+            if task.status != 'completed':
+                project_data[project_id]['total_tasks'] += 1
+
+                if task.status in ['in_progress', 'review', 'rework']:
+                    project_data[project_id]['in_progress_tasks'] += 1
+                elif task.status == 'assigned':
+                    project_data['project_id']['todo_tasks'] += 1
+
+        result = [p for p in project_data.values() if p['total_tasks'] > 0]
+
+        serializer = EmployeeProjectStatusSerializer(result, many=True)
+        return Response(serializer.data)

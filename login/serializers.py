@@ -29,6 +29,8 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
 
         role_redirects = {
             "management": "/dashboard/management",
+            "dm": "/dashboard/dm",
+            "pm": "/dashboard/pm",
             "hr": "/dashboard/hr",
             "tl": "/dashboard/tl",
             "employee": "/dashboard/employee",

@@ -6,6 +6,8 @@ app_name = "projects"
 urlpatterns = [
     path("dm/project/create/", views.DMCreateProjectAPIView.as_view()),
 
+    path("dm/project/<int:project_id>/assign-pm/", views.DMAssignPMAPIView.as_view()),
+
     path("pm/project/<int:project_id>/module/create/",
          views.PMCreateModuleAPIView.as_view()),
 
@@ -36,4 +38,14 @@ urlpatterns = [
          views.ProjectHierarchyAPIView.as_view()),
 
     path("analytics/hr/", views.HRProjectAnalyticsAPIView.as_view()),
+
+    path("dm/projects/", views.DMProjectListAPIView.as_view()),
+
+    path("pm/projects/", views.PMProjectListAPIView.as_view()),
+
+    path("tl/modules/", views.TLModuleListAPIView.as_view()),
+
+    path("employee/tasks/", views.EmployeeTaskListAPIView.as_view()),
+
+    path("employee/project-status/", views.EmployeeProjectStatusAPIView.as_view()),
 ]

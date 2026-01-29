@@ -91,6 +91,9 @@ class Task(models.Model):
         max_length=30, choices=STATUS, default='assigned'
     )
 
+    assigned_date = models.DateField(auto_now_add=True)
+    due_date = models.DateField(null=True, blank=True)
+
     def mark_completed(self, user):
         if user.role != 'tl':
             raise ValidationError("Only TL can complete a task.")

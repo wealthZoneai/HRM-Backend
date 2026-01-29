@@ -37,4 +37,7 @@ urlpatterns = [
 
     path("tl/announcement/<int:pk>/delete/", views.tl_delete_announcement,
          name="tl-delete-announcement"),
+
+    path("tl/announcements/list", views.list_announcements,
+         name="announcement-list"),
 ]
