@@ -1,6 +1,5 @@
 # emp/serializers.py
 from django.core.exceptions import ValidationError
-from urllib3 import request
 from .models import TimesheetEntry, TimesheetDay, Attendance
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -17,10 +16,16 @@ from django.utils import timezone
 from django.urls import reverse
 from .constants import LEAVE_TYPE_CHOICES, EMPLOYEE_DEPARTMENT_CHOICES
 from decimal import Decimal
+import uuid
+from django.db import transaction
 
 User = get_user_model()
 
 today = timezone.localdate()
+
+
+def generate_emp_id():
+    return f"WZG-AI-{uuid.uuid4().hex[:8].upper()}"
 
 
 class ContactSerializer(serializers.Serializer):
@@ -99,8 +104,6 @@ class EmployeeCreateSerializer(serializers.Serializer):
         default='employee'
     )
 
-    emp_id = serializers.CharField(
-        required=False, allow_blank=True, max_length=50)
     work_email = serializers.EmailField(required=False, allow_blank=True)
 
     contact = ContactSerializer(required=True)
@@ -162,6 +165,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
         data.setdefault('job', {})['team_lead'] = user.id
         return data
 
+    @transaction.atomic
     def create(self, validated_data):
         contact = validated_data.get('contact', {})
         job = validated_data.get('job', {})
@@ -174,9 +178,8 @@ class EmployeeCreateSerializer(serializers.Serializer):
         username_first = self._username_part(first_name)
         username_last = self._username_part(last_name)
 
-        base_username = ".".join(filter(None, [username_first, username_last]))
-        base_username = base_username.strip(".") or "user"
-
+        base_username = ".".join(
+            filter(None, [username_first, username_last])) or "user"
         username = base_username
         counter = 1
         while User.objects.filter(username=username).exists():
@@ -184,103 +187,71 @@ class EmployeeCreateSerializer(serializers.Serializer):
             counter += 1
 
         raw_email = validated_data.get('work_email')
-
         if raw_email:
-            # If HR provided email, clean it
             email = re.sub(r"\s+", "", raw_email)
         else:
-            # Auto-generate email from sanitized username parts
             email_local = ".".join(
-                filter(None, [username_first, username_last]))
-            email_local = email_local.strip(".") or "user"
+                filter(None, [username_first, username_last])) or "user"
             email = f"{email_local}@wealthzonegroupai.com"
 
         role = validated_data.get('role', 'employee')
 
+        # 1️⃣ Create user
         user = User.objects.create_user(
             username=username,
-            password=None,
+            email=email,
             first_name=first_name,
             last_name=last_name,
-            email=email,
-            role=role
+            role=role,
+            password=None,
         )
         user.set_unusable_password()
         user.save(update_fields=["password"])
 
-        prof, created = EmployeeProfile.objects.get_or_create(
+        # 2️⃣ Create employee profile (ONLY PLACE)
+        profile = EmployeeProfile.objects.create(
             user=user,
-            defaults={
-                'emp_id': validated_data.get('emp_id') or '',
-                'work_email': email or '',
-                'first_name': first_name,
-                'last_name': last_name,
-            }
+            emp_id=generate_emp_id(),
+            work_email=email,
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            start_date=timezone.localdate(),
         )
 
-        if prof.role != role:
-            prof.role = role
+        # 3️⃣ Update remaining fields
+        profile.middle_name = contact.get('middle_name')
+        profile.personal_email = contact.get('personal_email')
+        profile.phone_number = contact.get('phone_number')
+        profile.alternate_number = contact.get('alternate_number')
+        profile.dob = contact.get('dob')
+        profile.blood_group = contact.get('blood_group')
+        profile.gender = contact.get('gender')
+        profile.marital_status = contact.get('marital_status')
 
-        prof.first_name = first_name or prof.first_name
-        prof.middle_name = contact.get('middle_name') or prof.middle_name
-        prof.last_name = last_name or prof.last_name
-        prof.personal_email = contact.get(
-            'personal_email') or prof.personal_email
-        prof.phone_number = contact.get('phone_number') or prof.phone_number
-        prof.alternate_number = contact.get(
-            'alternate_number') or prof.alternate_number
-        prof.dob = contact.get('dob') or prof.dob
-        prof.blood_group = contact.get('blood_group') or prof.blood_group
-        prof.gender = contact.get('gender') or prof.gender
-        prof.marital_status = contact.get(
-            'marital_status') or prof.marital_status
-
-        if contact.get('profile_photo') is not None:
-            prof.profile_photo = contact.get('profile_photo')
-
-        prof.job_title = job.get('job_title') or prof.job_title
-        prof.department = job.get('department') or prof.department
-        prof.employment_type = job.get(
-            'employment_type') or prof.employment_type
-        prof.start_date = job.get('start_date') or prof.start_date
-        prof.location = job.get('location') or prof.location
-        prof.job_description = job.get(
-            'job_description') or prof.job_description
+        profile.job_title = job.get('job_title')
+        profile.department = job.get('department')
+        profile.employment_type = job.get('employment_type')
+        profile.start_date = job.get('start_date')
+        profile.location = job.get('location')
+        profile.job_description = job.get('job_description')
 
         if job.get('team_lead'):
-            prof.team_lead_id = int(job.get('team_lead'))
-
-        if job.get('id_image') is not None:
-            prof.id_image = job.get('id_image')
+            profile.team_lead_id = int(job.get('team_lead'))
 
         if bank:
-            prof.bank_name = bank.get('bank_name') or prof.bank_name
-            prof.ifsc_code = bank.get('ifsc_code') or prof.ifsc_code
-            prof.account_number = bank.get(
-                'account_number') or prof.account_number
-            prof.branch = bank.get('branch') or prof.branch
+            profile.bank_name = bank.get('bank_name')
+            profile.ifsc_code = bank.get('ifsc_code')
+            profile.account_number = bank.get('account_number')
+            profile.branch = bank.get('branch')
 
         if identification:
-            prof.aadhaar_number = identification.get(
-                'aadhaar_number') or prof.aadhaar_number
-            if identification.get('aadhaar_image') is not None:
-                prof.aadhaar_image = identification.get('aadhaar_image')
+            profile.aadhaar_number = identification.get('aadhaar_number')
+            profile.pan = identification.get('pan_number')
+            profile.passport_number = identification.get('passport_number')
 
-            prof.pan = identification.get('pan_number') or prof.pan
-            if identification.get('pan_image') is not None:
-                prof.pan_image = identification.get('pan_image')
-
-            prof.passport_number = identification.get(
-                'passport_number') or prof.passport_number
-            if identification.get('passport_image') is not None:
-                prof.passport_image = identification.get('passport_image')
-
-        if email:
-            prof.work_email = email
-
-        prof.save()
-
-        return user, prof
+        profile.save()
+        return user, profile
 
     def save(self, **kwargs):
         return self.create(self.validated_data)

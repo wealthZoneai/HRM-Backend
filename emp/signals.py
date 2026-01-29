@@ -32,35 +32,21 @@ def generate_work_email(first_name, last_name):
     return email
 
 
-def generate_emp_id():
-    last = EmployeeProfile.objects.order_by('-id').first()
-    if not last or not getattr(last, 'emp_id', None):
-        next_number = 1
-    else:
-        try:
-            last_num = int(last.emp_id.split('-')[-1])
-            next_number = last_num + 1
-        except Exception:
-            next_number = last.id + 1
-    return f"WZG-AI-{next_number:04d}"
-
-
 @receiver(post_save, sender=User)
 def create_employee_profile(sender, instance, created, **kwargs):
-    if created:
-        if not instance.username:
-            instance.username = generate_username(
-                instance.first_name or 'user', instance.last_name or get_random_string(4))
-            instance.save(update_fields=['username'])
-        if not instance.email:
-            instance.email = generate_work_email(
-                instance.first_name or 'user', instance.last_name or get_random_string(4))
-            instance.save(update_fields=['email'])
-        EmployeeProfile.objects.get_or_create(user=instance, defaults={
-            'emp_id': generate_emp_id(),
-            'work_email': instance.email or '',
-            'first_name': instance.first_name or '',
-            'last_name': instance.last_name or '',
-            'role': getattr(instance, 'role', 'employee'),
-            'start_date': timezone.localdate()
-        })
+    if not created:
+        return
+
+    if not instance.username:
+        instance.username = generate_username(
+            instance.first_name or 'user',
+            instance.last_name or get_random_string(4)
+        )
+        instance.save(update_fields=['username'])
+
+    if not instance.email:
+        instance.email = generate_work_email(
+            instance.first_name or 'user',
+            instance.last_name or get_random_string(4)
+        )
+        instance.save(update_fields=['email'])
