@@ -24,10 +24,10 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'second_phase',
+#         'NAME': 'api_testing',
 #         'USER': 'postgres',
 #         'PASSWORD': 'Dinesh@41216',
-#         'HOST': '192.168.1.3',
+#         'HOST': '192.168.1.24',
 #         'PORT': '5432',
 #     }
 # }

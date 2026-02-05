@@ -18,5 +18,6 @@ EMPLOYEE_DEPARTMENT_CHOICES = [
     ("HR", "HR"),
     ("BDM", "BDM"),
     ("Networking", "Networking"),
-    ("Cloud", "Cloud (AWS / DevOps)"),
+    ("Cloud", "Cloud"),
+    
 ]

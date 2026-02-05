@@ -8,8 +8,8 @@ import datetime
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('management', 'Management'),
-        ('dm', 'Delivery Manager'),
-        ('pm', 'Project Manager'),
+        ('delivery_manager', 'Delivery Manager'),
+        ('project_manager', 'Project Manager'),
         ('hr', 'HR'),
         ('tl', 'Team Leader'),
         ('employee', 'Employee'),
@@ -33,7 +33,7 @@ class PasswordResetOTP(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - OTP {self.otp}"
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["user", "-created_at"]),
