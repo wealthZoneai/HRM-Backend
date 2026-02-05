@@ -16,16 +16,11 @@ from django.utils import timezone
 from django.urls import reverse
 from .constants import LEAVE_TYPE_CHOICES, EMPLOYEE_DEPARTMENT_CHOICES
 from decimal import Decimal
-import uuid
 from django.db import transaction
 
 User = get_user_model()
 
 today = timezone.localdate()
-
-
-def generate_emp_id():
-    return f"WZG-AI-{uuid.uuid4().hex[:8].upper()}"
 
 
 class ContactSerializer(serializers.Serializer):
@@ -211,7 +206,6 @@ class EmployeeCreateSerializer(serializers.Serializer):
         # 2️⃣ Create employee profile (ONLY PLACE)
         profile = EmployeeProfile.objects.create(
             user=user,
-            emp_id=generate_emp_id(),
             work_email=email,
             first_name=first_name,
             last_name=last_name,

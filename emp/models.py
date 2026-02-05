@@ -6,17 +6,29 @@ from django.utils import timezone
 from .validators import validate_file_size, validate_image_extension
 from datetime import timedelta, time
 from decimal import Decimal
+from django.core.validators import RegexValidator
 from .constants import LEAVE_TYPE_CHOICES, EMPLOYEE_DEPARTMENT_CHOICES
 
 
 User = settings.AUTH_USER_MODEL
+
+emp_id_validator = RegexValidator(
+    regex=r"^WZG-AI-\d{4}$",
+    message="emp_id must be in format WZG-AI-0000"
+)
 
 
 class EmployeeProfile(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='employeeprofile')
 
-    emp_id = models.CharField(max_length=20, unique=True)
+    emp_id = models.CharField(
+        max_length=20,
+        unique=True,
+        validators=[emp_id_validator],
+        editable=False
+    )
+
     work_email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, null=True, blank=True)
 
@@ -646,3 +658,14 @@ class TimesheetEntry(models.Model):
 
     def __str__(self):
         return f"{getattr(self.profile, 'emp_id', self.profile.id)} {self.date} {self.task}"
+
+
+class EmployeeIDSequence(models.Model):
+    """
+    Single-row table for sequential emp_id generation.
+    """
+    last_value = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"EmployeeIDSequence(last_value={self.last_value})"

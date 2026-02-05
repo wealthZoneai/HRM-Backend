@@ -36,6 +36,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
 from django.contrib.auth.decorators import login_required
 import mimetypes
+from emp.utils import generate_emp_id
 
 
 User = get_user_model()
@@ -407,11 +408,12 @@ def emp_all_announcements(request):
 
     announcements = Announcement.objects.all().order_by('-date')
     hr_announcements = Announcement.objects.all()
-    
+
     serializer = AnnouncementSerializer(announcements, many=True)
-    
+
     try:
-        profile = EmployeeProfile.objects.select_related("team_lead").get(user=user)
+        profile = EmployeeProfile.objects.select_related(
+            "team_lead").get(user=user)
         tl_announcements = TLAnnouncement.objects.filter(
             created_by=profile.team_lead
         )
@@ -427,7 +429,7 @@ def emp_all_announcements(request):
         key=lambda x: (x["date"], x["time"]),
         reverse=True
     )
-    
+
     return Response({
         "success": True,
         "data": serializer.data
@@ -479,7 +481,7 @@ def emp_tl_announcements(request):
             user=request.user
         )
     except EmployeeProfile.DoesNotExist:
-        return Response({"success": True, "data":[]})
+        return Response({"success": True, "data": []})
 
     if not profile.team_lead:
         return Response({
@@ -683,49 +685,31 @@ class HRCreateEmployeeAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHROrManagement]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    @transaction.atomic
     def post(self, request):
-        data = {}
-
-        for key, value in request.data.items():
-            if key in ["contact", "job", "bank", "identification"]:
-
-                try:
-                    data[key] = json.loads(value) if isinstance(
-                        value, str) else value
-                except Exception:
-                    data[key] = value
-            else:
-                data[key] = value
-
-        for key, file_obj in request.FILES.items():
-
-            if key.startswith("contact."):
-                field = key.split("contact.")[1]
-                if "contact" not in data or not isinstance(data["contact"], dict):
-                    data["contact"] = {}
-                data["contact"][field] = file_obj
-
-            elif key.startswith("job."):
-                field = key.split("job.")[1]
-                if "job" not in data or not isinstance(data["job"], dict):
-                    data["job"] = {}
-                data["job"][field] = file_obj
-
-            elif key.startswith("identification."):
-                field = key.split("identification.")[1]
-                if "identification" not in data or not isinstance(data["identification"], dict):
-                    data["identification"] = {}
-                data["identification"][field] = file_obj
-
-            else:
-                data[key] = file_obj
+        # ✅ FIX 1: define data correctly
+        data = request.data.copy()
 
         serializer = EmployeeCreateSerializer(
-            data=data, context={'request': request})
+            data=data,
+            context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
 
+        # serializer creates user + profile (without emp_id)
         user, profile = serializer.save()
-        return Response(EmployeeProfileReadSerializer(profile).data, status=status.HTTP_201_CREATED)
+
+        # ✅ FIX 2: emp_id generated ONLY here
+        profile.emp_id = generate_emp_id()
+        profile.save(update_fields=["emp_id"])
+
+        return Response(
+            EmployeeProfileReadSerializer(
+                profile,
+                context={"request": request}
+            ).data,
+            status=status.HTTP_201_CREATED
+        )
 
 
 class MySensitiveDetailsAPIView(APIView):
@@ -1599,7 +1583,7 @@ class PolicyCreateAPIView(generics.CreateAPIView):
                 notif_type='policy',
                 is_read=False
             )
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1656,6 +1640,7 @@ class PolicyUpdateAPIView(generics.UpdateAPIView):
             status=status.HTTP_200_OK
         )
 
+
 class PolicyDeleteAPIView(generics.DestroyAPIView):
     queryset = models.Policy.objects.all()
     serializer_class = serializers.PolicySerializer
@@ -1674,7 +1659,7 @@ class PolicyDeleteAPIView(generics.DestroyAPIView):
                 notif_type='policy',
                 is_read=False
             )
-    
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         policy_title = instance.title
@@ -1688,6 +1673,7 @@ class PolicyDeleteAPIView(generics.DestroyAPIView):
             },
             status=status.HTTP_200_OK
         )
+
 
 class HRDashboardStatsAPIView(APIView):
     permission_classes = [IsHROrManagement]
