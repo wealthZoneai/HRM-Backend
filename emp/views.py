@@ -1,4 +1,5 @@
 # emp/views.py
+from urllib import request
 from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner
 from django.utils.dateparse import parse_date, parse_datetime
 from urllib.parse import unquote
@@ -36,7 +37,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
 from django.contrib.auth.decorators import login_required
 import mimetypes
-from emp.utils import generate_emp_id
+from emp.utils import generate_emp_id, get_employee_profile_or_404
 
 
 User = get_user_model()
@@ -82,8 +83,19 @@ class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = request.user.employeeprofile
-        return Response(serializers.EmployeeProfileReadSerializer(prof).data)
+        prof = get_employee_profile_or_404(request.user)
+        if not prof:
+            return Response(
+                {"detail": "Employee profile not found. Contact HR."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            serializers.EmployeeProfileReadSerializer(
+                prof,
+                context={"request": request}
+            ).data
+        )
 
 
 class ProtectedEmployeeDocumentView(APIView):
@@ -139,7 +151,14 @@ class UpdateContactView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         serializer = serializers.EmployeeContactUpdateSerializer(
             prof,
             data=request.data,
@@ -155,7 +174,14 @@ class UpdateIdentificationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         serializer = serializers.EmployeeIdentificationSerializer(
             prof,
             data=request.data,
@@ -505,7 +531,14 @@ class MySalaryDetailsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         try:
             es = prof.salary
             ser = serializers.EmployeeSalarySerializer(es).data
@@ -527,7 +560,14 @@ class PayslipDownloadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, year, month):
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         payslip = get_object_or_404(
             models.Payslip, profile=prof, year=year, month=month)
 
@@ -538,7 +578,14 @@ class MyLeaveBalancesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         balances = models.LeaveBalance.objects.filter(profile=prof)
         return Response(serializers.LeaveBalanceSerializer(balances, many=True).data)
 
@@ -561,7 +608,14 @@ class LeaveApplyAPIView(APIView):
         )
         ser.is_valid(raise_exception=True)
 
-        prof = request.user.employeeprofile
+        try:
+            prof = request.user.employeeprofile
+        except EmployeeProfile.DoesNotExist:
+            return Response(
+                {"detail": "Employee profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         start = ser.validated_data['start_date']
         end = ser.validated_data['end_date']
 

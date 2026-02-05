@@ -1,5 +1,5 @@
 from django.db import transaction
-from .models import EmployeeIDSequence
+from .models import EmployeeIDSequence, EmployeeProfile
 
 EMP_ID_PREFIX = "WZG-AI"
 EMP_ID_WIDTH = 4
@@ -12,3 +12,14 @@ def generate_emp_id():
     seq.save(update_fields=["last_value"])
 
     return f"{EMP_ID_PREFIX}-{seq.last_value:0{EMP_ID_WIDTH}d}"
+
+
+def get_employee_profile_or_404(user):
+    """
+    Safely fetch EmployeeProfile for a user.
+    Returns None if profile does not exist.
+    """
+    try:
+        return user.employeeprofile
+    except EmployeeProfile.DoesNotExist:
+        return None
