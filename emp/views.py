@@ -1,9 +1,12 @@
 # emp/views.py
 from urllib import request
+
+from emp.services import AttendanceQueryService, AttendanceReportService, AttendanceService
 from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner
 from django.utils.dateparse import parse_date, parse_datetime
 from urllib.parse import unquote
 from .serializers import (
+    AttendanceReadSerializer,
     TimesheetEntrySerializer,
     DailyTimesheetUpdateSerializer,
     EmployeeCreateSerializer,
@@ -278,138 +281,79 @@ class ClockInAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        today = timezone.localdate()
-
-        if models.Attendance.objects.filter(user=user, date=today).exists():
-            return Response({"detail": "Attendance for today already exists."}, status=400)
-        att = models.Attendance.objects.create(user=user, date=today, clock_in=timezone.now(
-        ), status='working')
-        return Response(serializers.AttendanceReadSerializer(att).data, status=201)
-
-
+        at=AttendanceService.clock_in(request.user)
+        if at is None:
+            return Response({'details':'Already clocked in today.'},status=400)
+        s=AttendanceReadSerializer(at)
+        return Response(s.data,status=201)
+    
 class ClockOutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        today = timezone.localdate()
+        at, error = AttendanceService.clock_out(request.user)
 
-        att = models.Attendance.objects.filter(
-            user=user,
-            date=today
-        ).first()
-
-        if not att:
+        if error == "NO_CLOCK_IN":
             return Response(
                 {"detail": "No clock-in found for today."},
                 status=400
             )
 
-        if att.clock_out:
+        if error == "ALREADY_CLOCKED_OUT":
             return Response(
                 {"detail": "Already clocked out."},
                 status=400
             )
 
-        att.clock_out = timezone.now()
-        att.compute_duration_and_overtime()
-        att.save()
-
-        data = serializers.AttendanceReadSerializer(att).data
-
-        return Response(data, status=200)
+        s = AttendanceReadSerializer(at)
+        return Response(s.data, status=200)
 
 
 class MyAttendanceDaysAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = serializers.AttendanceReadSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        month = self.request.query_params.get('month')
-        if month:
-            y, m = map(int, month.split('-'))
-            return models.Attendance.objects.filter(user=user, date__year=y, date__month=m).order_by('-date')
-        else:
-            return models.Attendance.objects.filter(user=user).order_by('-date')[:30]
-
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
+        user = request.user
+        month = request.query_params.get("month")
 
-        total_seconds = 0
-        overtime_seconds = 0
-        monthly_late_count = 0
+        queryset = AttendanceReportService.get_attendance_queryset(user, month)
 
-        late_time_limit = time(9, 45)
-        regular_work_seconds = 9 * 60 * 60
+        summary = AttendanceReportService.calculate_monthly_summary(queryset)
 
-        # -------- Monthly Calculations --------
-        for att in queryset:
-            worked_seconds = 0
+        total_hours = AttendanceReportService.format_seconds(
+            summary["total_seconds"]
+        )
+        overtime = AttendanceReportService.format_seconds(
+            summary["overtime_seconds"]
+        )
+        late_arrivals = summary["late_count"]
 
-            # ✅ Total hours = sum of duration_time
-            if att.clock_in and att.clock_out and att.duration_time:
-                worked_seconds = att.duration_time.total_seconds()
-                total_seconds += worked_seconds
-
-                # ✅ Overtime after 9 hours
-            if worked_seconds > regular_work_seconds:
-                overtime_seconds += (worked_seconds - regular_work_seconds)
-
-            # ✅ Late arrivals (after 09:30 AM)
-            if att.clock_in:
-                clock_in_time = att.clock_in.astimezone().time()
-                if clock_in_time > late_time_limit:
-                    monthly_late_count += 1
-
-        total_hours_str = self.format_time(total_seconds)
-        overtime_str = self.format_time(overtime_seconds)
-
-        # -------- Serialize daily records --------
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
 
-        # -------- Inject monthly values (KEEP SAME FORMAT) --------
         for record in data:
-            record["total_hours"] = total_hours_str
-            record["overtime"] = overtime_str
-            record["late_arrivals"] = monthly_late_count
+            record["total_hours"] = total_hours
+            record["overtime"] = overtime
+            record["late_arrivals"] = late_arrivals
 
         return Response(data)
-
-    def format_time(self, seconds):
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        return f"{int(hours):02d}:{int(minutes):02d}"
-
+     
 
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        user = request.user
-        today = timezone.localdate()
-        qs = Attendance.objects.filter(date=today)
+        queryset = AttendanceQueryService.get_today_attendance(request.user)
 
-        if user.role == "employee":
-            qs = qs.filter(user=user)
-
-        elif user.role in ['tl', 'hr']:
-            qs = qs.filter(
-                Q(user=user) | Q(user__role="employee")
-            )
-
-        else:
+        if queryset is None:
             return Response(
                 {"detail": "Unauthorized"},
                 status=403
             )
 
-        qs = qs.select_related("user").order_by("user__username")
-
-        serializer = TodayAttendanceSerializer(qs, many=True)
+        serializer = TodayAttendanceSerializer(queryset, many=True)
         return Response(serializer.data, status=200)
+
+    
 
 
 class CalendarEventsAPIView(generics.ListAPIView):
