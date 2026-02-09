@@ -1,4 +1,5 @@
 # hr/models.py
+from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -36,26 +37,26 @@ class Announcement(models.Model):
         return self.title
 
 
-class TLAnnouncement(models.Model):
-    PRIORITY_CHOICES = [
-        ("LOW", "Low"),
-        ("MEDIUM", "Medium"),
-        ("HIGH", "High"),
-    ]
+# class TLAnnouncement(models.Model):
+#     PRIORITY_CHOICES = [
+#         ("LOW", "Low"),
+#         ("MEDIUM", "Medium"),
+#         ("HIGH", "High"),
+#     ]
 
-    title = models.CharField(max_length=200)
-    description = models.TextField()
-    date = models.DateField()
-    time = models.TimeField()
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tl_announcements'
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    show_in_calendar = models.BooleanField(default=True)
+#     title = models.CharField(max_length=200)
+#     description = models.TextField()
+#     date = models.DateField()
+#     time = models.TimeField()
+#     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
+#     created_by = models.ForeignKey(
+#         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tl_announcements'
+#     )
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     show_in_calendar = models.BooleanField(default=True)
 
-    def __str__(self):
-        return self.title
+#     def __str__(self):
+#         return self.title
 
 
 class SalaryStructure(models.Model):

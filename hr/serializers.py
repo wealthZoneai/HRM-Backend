@@ -3,6 +3,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveType, LeaveBalance
 from .models import Announcement
+from django.utils import timezone
+from datetime import datetime
+from decimal import Decimal
 from .models import TLAnnouncement as HR_TLAnnouncement
 from django.utils import timezone
 from datetime import datetime
@@ -251,6 +254,13 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# class TLAnnouncementSerializer(serializers.ModelSerializer):
+#     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
+#     class Meta:
+#         model = HR_TLAnnouncement
+#         fields = "__all__"
+#         read_only_fields = ("created_by", "created_at", "id")
 class TLAnnouncementSerializer(serializers.ModelSerializer):
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
 

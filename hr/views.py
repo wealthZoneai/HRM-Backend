@@ -17,6 +17,9 @@ from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
 from . import models
+from .serializers import AnnouncementSerializer, MySalaryDetailSerializer
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from .serializers import AnnouncementSerializer
 from .serializers import AnnouncementSerializer, TLAnnouncementSerializer, MySalaryDetailSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
@@ -160,19 +163,31 @@ def list_announcements(request):
         "data": serializer.data
     })
 
+@api_view(['PUT','PATCH'])
 
 @api_view(['PUT', 'PATCH'])
 @authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated , IsHR])
+def update_announcement(request,pk):
+@permission_classes([IsAuthenticated])
 @permission_classes([IsAuthenticated, IsHR])
 def update_announcement(request, pk):
     try:
-        announce = Announcement.objects.get(pk=pk)
+        announcement_data = Announcement.objects.get(pk=pk)
     except Announcement.DoesNotExist:
+        return Response({"error":"Announcement not found"},status=404)
+    serializer = AnnouncementSerializer(
+        announcement_data,
+        data=request.data,
+        partial=True
+    )
         return Response({"error": "Announcement not found"}, status=404)
 
     serializer = AnnouncementSerializer(
         announce, data=request.data, partial=True)
     if serializer.is_valid():
+        updated_announcement = serializer.save()
+        employees = User.objects.filter(employeeprofile__isnull=False)
         announcement = serializer.save()
 
         employees = User.objects.filter(employeeprofile__isnull=False)
@@ -180,11 +195,17 @@ def update_announcement(request, pk):
         for emp in employees:
             Notification.objects.create(
                 to_user=emp,
-                title="Announcement Updated",
-                body=f"The announcement '{announcement.title}' was updated.",
+                title="announcement updated",
+                body="The announcement"+updated_announcement.title+"was updated",
                 notif_type="announcement",
-                extra={"announcement_id": announcement.id}
+                extra={"announcement_id":updated_announcement.id}
             )
+        return Response({
+        "success":True,
+        "data":serializer.data
+        })
+    return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+        # -------------------------------------
 
         return Response({"success": True, "data": serializer.data})
     
@@ -196,9 +217,12 @@ def update_announcement(request, pk):
 @permission_classes([IsAuthenticated, IsHR])
 def delete_announcement(request, pk):
     try:
-        announce = Announcement.objects.get(pk=pk)
+        announcement_data = Announcement.objects.get(pk=pk)
     except Announcement.DoesNotExist:
         return Response({"error": "Announcement not found"}, status=404)
+    announcement_title = announcement_data.title
+    announcement_data.delete() 
+    employees = User.objects.filter(employeeprofile__isnull=False)
 
     title = announce.title
     announce.delete()
@@ -209,13 +233,20 @@ def delete_announcement(request, pk):
         Notification.objects.create(
             to_user=emp,
             title="Announcement Deleted",
-            body=f"The announcement '{title}' was deleted.",
+            body=f"The Announcement"+announcement_title+"was deleted.",
             notif_type="announcement"
         )
 
     return Response({"success": True, "message": "Deleted successfully"})
 
 
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def emp_tl_announcements(request):
+#     profile = EmployeeProfile.objects.filter(
+#         user=request.user).select_related('team_lead').first()
+#     if not profile:
+#         return Response({"message": "No profile found for user"}, status=404)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def emp_tl_announcements(request):
@@ -224,13 +255,62 @@ def emp_tl_announcements(request):
     if not profile:
         return Response({"message": "No profile found for user"}, status=404)
 
+#     tl = profile.team_lead
+#     if not tl:
+#         return Response({"message": "No Team Lead assigned"}, status=200)
+    # Employee’s assigned Team Lead
     tl = profile.team_lead
     if not tl:
         return Response({"message": "No Team Lead assigned"}, status=200)
 
+#     announcements = TLAnnouncement.objects.filter(created_by=tl)
+#     serializer = TLAnnouncementSerializer(announcements, many=True)
+#     return Response(serializer.data)
     announcements = TLAnnouncement.objects.filter(created_by=tl)
     serializer = TLAnnouncementSerializer(announcements, many=True)
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsHR])
+def create_announcement(request):
+    serializer = AnnouncementSerializer(data=request.data)
+    if serializer.is_valid():
+        announcement = serializer.save(created_by=request.user)
+        if announcement.show_in_calendar:
+            CalendarEvent.objects.create(
+                title=announcement.title,
+                description=announcement.description,
+                event_type="announcement",
+                date=announcement.date,
+                start_time=announcement.time,
+                created_by=request.user,
+                extra={
+                    "announcement_id": announcement.id,
+                    "source": "HR"
+                }
+            )
+        employees = User.objects.filter(employeeprofile__isnull=False)
+        notification_list = []
+        for emp in employees:
+            notification = Notification(
+                to_user=emp,
+                title="New Announcement: " + announcement.title,
+                body=announcement.description,
+                notif_type="announcement",
+                extra={"announcement_id": announcement.id}
+            )
+            notification_list.append(notification)
+        Notification.objects.bulk_create(notification_list)
+        return Response({
+            "success": True,
+            "message": "Announcement created successfully",
+            "data": serializer.data
+        }, status=201)
+    return Response(serializer.errors, status=400)
+
+
 
 
 @api_view(['POST'])
