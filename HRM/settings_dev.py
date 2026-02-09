@@ -21,13 +21,12 @@ EMAIL_HOST_PASSWORD = 'khfj qsft sjeb tvax'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'second_phase',
-#         'USER': 'postgres',
-#         'PASSWORD': 'Dinesh@41216',
-#         'HOST': '192.168.1.3',
-#         'PORT': '5432',
-#     }
-# }
+#DATABASES = {
+  #  'default': {
+   #   'USER': 'postgres',
+    #    'PASSWORD': 'Dinesh@41216',
+     #   'HOST': '192.168.1.24',
+       # 'PORT': '5432',
+    #}
+#}
+ 

@@ -548,6 +548,10 @@ class AttendanceReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
         fields = '__all__'
+        read_only_fields = (
+            "duration_time",
+            "duration_seconds",
+        )
 
     def format_time(self, duration):
         if not duration:

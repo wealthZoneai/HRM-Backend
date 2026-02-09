@@ -22,6 +22,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
 from django.db import IntegrityError
 from django.utils.dateparse import parse_datetime
+from .service import AttendanceCorrectionService
 
 
 User = get_user_model()
@@ -104,51 +105,16 @@ class HRAttendanceRetrieveAPIView(generics.RetrieveAPIView):
 
 class HRAttendanceCorrectAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
-
     def post(self, request, attendance_id):
-        att = get_object_or_404(Attendance, id=attendance_id)
+        attendance = get_object_or_404(Attendance, id=attendance_id)
 
-        clock_in_str = request.data.get("clock_in")
-        clock_out_str = request.data.get("clock_out")
-        note = request.data.get("note", "Corrected by HR")
-        status = request.data.get("status")
+        attendance = AttendanceCorrectionService.correct_attendance(
+            attendance=attendance,
+            data=request.data
+        )
 
-        # Parse datetime safely
-        if clock_in_str:
-            clock_in = parse_datetime(clock_in_str)
-            if clock_in:
-                new_date = clock_in.date()
-
-                # 🔒 Check UNIQUE constraint before changing date
-                exists = Attendance.objects.filter(
-                    user=att.user,
-                    date=new_date
-                ).exclude(id=att.id).exists()
-
-                if not exists:
-                    att.date = new_date  # ✅ safe to update
-                # else: do NOT update date
-
-                att.clock_in = clock_in
-
-        if clock_out_str:
-            clock_out = parse_datetime(clock_out_str)
-            if clock_out:
-                att.clock_out = clock_out
-
-        if status:
-            att.status = status
-        new_note = f"HR correction: {note}"
-
-        if not att.note:
-            att.note = new_note
-        elif new_note not in att.note:
-            att.note += f"\n{new_note}"
-
-        att.manual_entry = True
-        att.save()
-
-        return Response(serializers.AttendanceAdminSerializer(att).data)
+        serializer = serializers.AttendanceAdminSerializer(attendance)
+        return Response(serializer.data, status=200)
 
 
 class ShiftListCreateAPIView(generics.ListCreateAPIView):
