@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import timedelta
 import sys
 import dj_database_url
-
+ 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get(
@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
+ 
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -30,8 +30,8 @@ INSTALLED_APPS = [
 
     'hr', 'emp', 'tl', 'login', 'management', 'projects','support',
 ]
-
-
+ 
+ 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -43,10 +43,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
-
+ 
+ 
 ROOT_URLCONF = 'HRM.urls'
-
+ 
 WSGI_APPLICATION = 'HRM.wsgi.application'
 
 REST_FRAMEWORK = {
@@ -77,8 +77,8 @@ REST_FRAMEWORK = {
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
-
-
+ 
+ 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'HRM API',
     'DESCRIPTION': 'HRM REST API',
@@ -93,8 +93,8 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
-
-
+ 
+ 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -109,8 +109,8 @@ TEMPLATES = [
         },
     },
 ]
-
-
+ 
+ 
 DATABASES = {
     'default': dj_database_url.parse(
         os.environ.get(
@@ -121,8 +121,8 @@ DATABASES = {
         ssl_require=False
     )
 }
-
-
+ 
+ 
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -140,13 +140,13 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 AUTH_USER_MODEL = 'login.User'
-
+ 
 LANGUAGE_CODE = 'en-us'
-
+ 
 TIME_ZONE = 'Asia/Kolkata'
-
+ 
 USE_I18N = True
-
+ 
 USE_TZ = True
 
 
@@ -168,7 +168,7 @@ try:
 
         insert_index = 2 if len(MIDDLEWARE) >= 2 else len(MIDDLEWARE)
         MIDDLEWARE.insert(insert_index, wn_mw)
-
+ 
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 except Exception:
 

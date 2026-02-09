@@ -412,11 +412,16 @@ class HRLeaveListAPIView(generics.ListAPIView):
     serializer_class = serializers.LeaveRequestAdminSerializer
 
     def get_queryset(self):
-        q = LeaveRequest.objects.all().select_related('profile')
+
+        # Get all leave requests with employee profile
+        leaves = LeaveRequest.objects.select_related('profile')
+
+
         status = self.request.query_params.get('status')
         if status:
-            q = q.filter(status=status)
-        return q
+            leaves = leaves.filter(status=status)
+
+        return leaves
 
 
 class HRLeaveDetailAPIView(generics.RetrieveAPIView):
