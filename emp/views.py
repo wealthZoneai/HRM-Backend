@@ -24,8 +24,14 @@ class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = request.user.employeeprofile
-        return Response(serializers.EmployeeProfileReadSerializer(prof).data)
+
+        profile, created = EmployeeProfile.objects.get_or_create(
+            user=request.user
+        )
+
+        serializer = serializers.EmployeeProfileReadSerializer(profile)
+
+        return Response(serializer.data)
 
 
 class UpdateContactView(APIView):
