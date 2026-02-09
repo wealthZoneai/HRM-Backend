@@ -86,68 +86,8 @@ class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = get_employee_profile_or_404(request.user)
-        if not prof:
-            return Response(
-                {"detail": "Employee profile not found. Contact HR."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        return Response(
-            serializers.EmployeeProfileReadSerializer(
-                prof,
-                context={"request": request}
-            ).data
-        )
-
-
-class ProtectedEmployeeDocumentView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, emp_id, doc_field):
-        """
-        emp_id     -> EmployeeProfile.emp_id
-        doc_field  -> model field name (aadhaar_front_image, pan_back_image, etc)
-        """
-
-        try:
-            profile = EmployeeProfile.objects.get(emp_id=emp_id)
-        except EmployeeProfile.DoesNotExist:
-            raise Http404("Employee not found")
-
-        # --- ACCESS CONTROL ---
-        user = request.user
-        if user.role not in ("hr", "management") and profile.user != user:
-            raise Http404("Not allowed")
-
-        # --- VALID FIELDS (whitelist) ---
-        allowed_fields = {
-            "aadhaar_front_image",
-            "aadhaar_back_image",
-            "pan_front_image",
-            "pan_back_image",
-            "passport_front_image",
-            "passport_back_image",
-        }
-
-        if doc_field not in allowed_fields:
-            raise Http404("Invalid document")
-
-        file = getattr(profile, doc_field, None)
-        if not file:
-            raise Http404("File not found")
-
-        content_type, _ = mimetypes.guess_type(file.path)
-
-        response = FileResponse(
-            open(file.path, "rb"),
-            content_type=content_type or "application/octet-stream"
-        )
-
-        # ✅ FORCE INLINE VIEW (not download)
-        response["Content-Disposition"] = f'inline; filename="{file.name}"'
-
-        return response
+        prof = request.user.employeeprofile
+        return Response(serializers.EmployeeProfileReadSerializer(prof).data)
 
 
 class UpdateContactView(APIView):
