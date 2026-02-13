@@ -1,23 +1,36 @@
 from rest_framework.permissions import BasePermission
+from login.models import User
 
 
 class IsDM(BasePermission):
     def has_permission(self, request, view):
-        has_perm = request.user.is_authenticated and request.user.role in ('management', 'dm')
-        print(f"DEBUG: IsDM check for {request.user} (Role: {request.user.role}) -> {has_perm}")
-        return has_perm
+        user = request.user
+        return bool(
+            user and user.is_authenticated and
+            user.role in (User.ROLE_MANAGEMENT, User.ROLE_DM)
+        )
 
 
 class IsPM(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'pm'
+        user = request.user
+        return bool(
+            user and user.is_authenticated and user.role == User.ROLE_PM
+        )
 
 
 class IsTL(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'tl'
+        user = request.user
+        return bool(
+            user and user.is_authenticated and user.role == User.ROLE_TL
+        )
 
 
 class IsEmployee(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ('employee', 'intern')
+        user = request.user
+        return bool(
+            user and user.is_authenticated and
+            user.role in (User.ROLE_EMPLOYEE, User.ROLE_INTERN)
+        )

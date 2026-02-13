@@ -1,6 +1,6 @@
 # hr/views.py
+from decimal import Decimal
 from tl.models import TLAnnouncement
-from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import generics, status, permissions
 from rest_framework.views import APIView
@@ -9,21 +9,17 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from emp.models import EmployeeProfile, Shift, Attendance, CalendarEvent, SalaryStructure, EmployeeSalary, Payslip, LeaveRequest, LeaveBalance, Notification
-from . import serializers
-from .permissions import IsHR, IsTL
+from . import serializers, models
+from .permissions import IsHR, IsHRorDMorPM, IsTL
 from projects.permissions import IsDM, IsPM
 from django.db.models import Sum, Count
 from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
-from . import models
-from .serializers import AnnouncementSerializer, MySalaryDetailSerializer
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from .serializers import AnnouncementSerializer
 from .serializers import AnnouncementSerializer, TLAnnouncementSerializer, MySalaryDetailSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.dateparse import parse_datetime
 from .service import AttendanceCorrectionService
 
@@ -46,7 +42,7 @@ class HRUpdateEmployeeRoleAPIView(generics.UpdateAPIView):
 
 
 class HRListEmployeesAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsHR | IsDM | IsPM]
+    permission_classes = [IsAuthenticated, IsHRorDMorPM]
     serializer_class = serializers.EmployeeListSerializer
 
     def get_queryset(self):
@@ -108,6 +104,7 @@ class HRAttendanceRetrieveAPIView(generics.RetrieveAPIView):
 
 class HRAttendanceCorrectAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
+
     def post(self, request, attendance_id):
         attendance = get_object_or_404(Attendance, id=attendance_id)
 
@@ -163,81 +160,67 @@ def list_announcements(request):
         "data": serializer.data
     })
 
-@api_view(['PUT','PATCH'])
 
 @api_view(['PUT', 'PATCH'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated , IsHR])
-def update_announcement(request,pk):
-@permission_classes([IsAuthenticated])
 @permission_classes([IsAuthenticated, IsHR])
 def update_announcement(request, pk):
-    try:
-        announcement_data = Announcement.objects.get(pk=pk)
-    except Announcement.DoesNotExist:
-        return Response({"error":"Announcement not found"},status=404)
+    announcement = get_object_or_404(Announcement, pk=pk)
+
     serializer = AnnouncementSerializer(
-        announcement_data,
+        announcement,
         data=request.data,
         partial=True
     )
-        return Response({"error": "Announcement not found"}, status=404)
 
-    serializer = AnnouncementSerializer(
-        announce, data=request.data, partial=True)
-    if serializer.is_valid():
-        updated_announcement = serializer.save()
-        employees = User.objects.filter(employeeprofile__isnull=False)
-        announcement = serializer.save()
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
 
-        employees = User.objects.filter(employeeprofile__isnull=False)
+    updated_announcement = serializer.save()
 
-        for emp in employees:
-            Notification.objects.create(
-                to_user=emp,
-                title="announcement updated",
-                body="The announcement"+updated_announcement.title+"was updated",
-                notif_type="announcement",
-                extra={"announcement_id":updated_announcement.id}
-            )
-        return Response({
-        "success":True,
-        "data":serializer.data
-        })
-    return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
-        # -------------------------------------
+    employees = User.objects.filter(employeeprofile__isnull=False)
 
-        return Response({"success": True, "data": serializer.data})
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    Notification.objects.bulk_create([
+        Notification(
+            to_user=emp,
+            title="Announcement Updated",
+            body=f"The announcement '{updated_announcement.title}' was updated.",
+            notif_type="announcement",
+            extra={"announcement_id": updated_announcement.id}
+        )
+        for emp in employees
+    ])
+
+    return Response(
+        {"success": True, "data": serializer.data},
+        status=200
+    )
 
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsHR])
 def delete_announcement(request, pk):
-    try:
-        announcement_data = Announcement.objects.get(pk=pk)
-    except Announcement.DoesNotExist:
-        return Response({"error": "Announcement not found"}, status=404)
-    announcement_title = announcement_data.title
-    announcement_data.delete() 
-    employees = User.objects.filter(employeeprofile__isnull=False)
-
-    title = announce.title
-    announce.delete()
+    announcement = get_object_or_404(Announcement, pk=pk)
+    title = announcement.title
+    announcement.delete()
 
     employees = User.objects.filter(employeeprofile__isnull=False)
 
-    for emp in employees:
-        Notification.objects.create(
+    Notification.objects.bulk_create([
+        Notification(
             to_user=emp,
             title="Announcement Deleted",
-            body=f"The Announcement"+announcement_title+"was deleted.",
+            body=f"The announcement '{title}' was deleted.",
             notif_type="announcement"
         )
+        for emp in employees
+    ])
 
-    return Response({"success": True, "message": "Deleted successfully"})
+    return Response(
+        {"success": True, "message": "Deleted successfully"},
+        status=200
+    )
 
 
 # @api_view(['GET'])
@@ -269,48 +252,6 @@ def emp_tl_announcements(request):
     announcements = TLAnnouncement.objects.filter(created_by=tl)
     serializer = TLAnnouncementSerializer(announcements, many=True)
     return Response(serializer.data)
-
-
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated, IsHR])
-def create_announcement(request):
-    serializer = AnnouncementSerializer(data=request.data)
-    if serializer.is_valid():
-        announcement = serializer.save(created_by=request.user)
-        if announcement.show_in_calendar:
-            CalendarEvent.objects.create(
-                title=announcement.title,
-                description=announcement.description,
-                event_type="announcement",
-                date=announcement.date,
-                start_time=announcement.time,
-                created_by=request.user,
-                extra={
-                    "announcement_id": announcement.id,
-                    "source": "HR"
-                }
-            )
-        employees = User.objects.filter(employeeprofile__isnull=False)
-        notification_list = []
-        for emp in employees:
-            notification = Notification(
-                to_user=emp,
-                title="New Announcement: " + announcement.title,
-                body=announcement.description,
-                notif_type="announcement",
-                extra={"announcement_id": announcement.id}
-            )
-            notification_list.append(notification)
-        Notification.objects.bulk_create(notification_list)
-        return Response({
-            "success": True,
-            "message": "Announcement created successfully",
-            "data": serializer.data
-        }, status=201)
-    return Response(serializer.errors, status=400)
-
-
 
 
 @api_view(['POST'])
@@ -398,6 +339,7 @@ class MyPayrollDetailsAPIView(APIView):
 class HRGeneratePayslipAPIView(APIView):
     permission_classes = [IsAuthenticated, IsHR]
 
+    @transaction.atomic
     def post(self, request, profile_id):
         profile = get_object_or_404(EmployeeProfile, id=profile_id)
 
@@ -425,7 +367,7 @@ class HRGeneratePayslipAPIView(APIView):
         absent_days = working_days - days_present
 
         # --- Salary breakup ---
-        monthly_gross = float(structure.monthly_ctc)
+        monthly_gross = Decimal(structure.monthly_ctc)
 
         prorata_gross = (
             monthly_gross * (days_present / working_days)
@@ -436,9 +378,9 @@ class HRGeneratePayslipAPIView(APIView):
         hra = structure.hra_amount()
         pf = structure.pf_amount()
 
-        professional_tax = 200
-        insurance = float(request.data.get('insurance', 0))
-        esi = float(request.data.get('esi', 0))
+        professional_tax = Decimal("200")
+        insurance = Decimal(request.data.get('insurance', 0))
+        esi = Decimal(request.data.get('esi', 0))
 
         # --- Overtime ---
         overtime_seconds = attendances.aggregate(
@@ -447,10 +389,8 @@ class HRGeneratePayslipAPIView(APIView):
 
         hourly_rate = es.hourly_rate(working_days)
         overtime_amount = (
-            (overtime_seconds / 3600) *
-            hourly_rate *
-            float(structure.overtime_multiplier)
-        )
+            Decimal(overtime_seconds) / Decimal(3600)
+        ) * hourly_rate * structure.overtime_multiplier
 
         total_deductions = pf + professional_tax + insurance + esi
         net_amount = prorata_gross + overtime_amount - total_deductions
@@ -495,7 +435,6 @@ class HRLeaveListAPIView(generics.ListAPIView):
 
         # Get all leave requests with employee profile
         leaves = LeaveRequest.objects.select_related('profile')
-
 
         status = self.request.query_params.get('status')
         if status:

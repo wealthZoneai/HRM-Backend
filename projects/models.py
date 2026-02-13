@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from login.models import User as LoginUser
 
 User = settings.AUTH_USER_MODEL
 
@@ -95,7 +96,7 @@ class Task(models.Model):
     due_date = models.DateField(null=True, blank=True)
 
     def mark_completed(self, user):
-        if user.role != 'tl':
+        if user.role != LoginUser.ROLE_TL:
             raise ValidationError("Only TL can complete a task.")
         if self.subtasks.exclude(status='completed').exists():
             raise ValidationError("All subtasks must be completed.")

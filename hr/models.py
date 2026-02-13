@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
-from decimal import Decimal
 from .constants import ANNOUNCEMENT_AUDIENCE_CHOICES
 
 
@@ -28,10 +27,12 @@ class Announcement(models.Model):
     show_in_calendar = models.BooleanField(default=True)
 
     class Meta:
-        models.UniqueConstraint(
-            fields=['date', 'time'],
-            name='unique_announcement_datetime'
-        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["date", "time"],
+                name="unique_hr_announcement_datetime"
+            )
+        ]
 
     def __str__(self):
         return self.title
@@ -137,11 +138,3 @@ class Payslip(models.Model):
 
     def __str__(self):
         return f"HR Payslip: {self.profile.user.username} - {self.month}/{self.year}"
-
-class Meta:
-    constraints = [
-        models.UniqueConstraint(
-            fields=['date', 'time'],
-            name='unique_hr_announcement_datetime'
-        )
-    ]

@@ -1,43 +1,47 @@
 from django.utils import timezone
-from django.db import transaction,IntegrityError
+from django.db import transaction, IntegrityError
 from emp.models import Attendance
-from datetime import datetime,time
+from datetime import datetime, time
 from django.db.models import Q
+
+
 class AttendanceService:
 
     @staticmethod
     @transaction.atomic
     def clock_in(user):
-        today=timezone.localdate()
-        now=timezone.localtime()
+        today = timezone.localdate()
+        now = timezone.localtime()
         try:
-            attendance=Attendance.objects.create(user=user,date=today,clock_in=timezone.now(),status='working')
+            attendance = Attendance.objects.create(
+                user=user, date=today, clock_in=timezone.now(), status='working')
             return attendance
         except IntegrityError:
             return None
-    
+
+    @staticmethod
+    @transaction.atomic
     def clock_out(user):
         today = timezone.localdate()
 
-        at = Attendance.objects.filter(
+        attendance = Attendance.objects.select_for_update().filter(
             user=user,
             date=today
         ).first()
 
-        # No clock-in found
-        if not at:
+        if not attendance:
             return None, "NO_CLOCK_IN"
 
-        # Already clocked out
-        if at.clock_out:
+        if attendance.clock_out:
             return None, "ALREADY_CLOCKED_OUT"
 
-        # Perform clock-out
-        at.clock_out = timezone.now()
-        at.compute_duration_and_overtime()
-        at.save()
+        attendance.clock_out = timezone.now()
+        attendance.compute_duration_and_overtime()
+        attendance.save()
 
-        return at, None
+        return attendance, None
+
+
 class AttendanceReportService:
     """
     Handles attendance reporting business logic
@@ -95,6 +99,8 @@ class AttendanceReportService:
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         return f"{hours:02d}:{minutes:02d}"
+
+
 class AttendanceQueryService:
     """
     Handles attendance query logic based on user roles
@@ -120,4 +126,3 @@ class AttendanceQueryService:
             return None
 
         return queryset.select_related("user").order_by("user__username")
-                                                 

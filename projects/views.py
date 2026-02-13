@@ -16,6 +16,8 @@ from .serializers import (
     TaskSerializer, SubTaskSerializer, EmployeeProjectStatusSerializer)
 from .permissions import IsDM, IsPM, IsTL, IsEmployee
 from emp.permissions import IsHROrManagement
+from login.models import User as LoginUser
+from django.db import transaction
 
 
 class DMCreateProjectAPIView(APIView):
@@ -34,13 +36,11 @@ class DMAssignPMAPIView(APIView):
     permission_classes = [IsAuthenticated, IsDM]
 
     def post(self, request, project_id):
-        project = get_object_or_404(project, id=project_id)
+        project = get_object_or_404(Project, id=project_id)
         serializer = AssignPMSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        pm_id = serializer.vlidated_data['project_manager']
-        User = get_user_model()
-        pm_user = get_object_or_404(User, id=pm_id)
+        pm_user = serializer.validated_data['project_manager']
 
         try:
             project.assign_pm(pm_user)
@@ -96,6 +96,7 @@ class EmployeeCreateSubTaskAPIView(APIView):
 class ProjectStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, project_id):
         project = get_object_or_404(Project, id=project_id)
 
@@ -105,10 +106,10 @@ class ProjectStatusUpdateAPIView(APIView):
         new_status = serializer.validated_data['status']
         user_role = request.user.role
 
-        if new_status in ('completed', 'closed') and user_role != 'management':
+        if new_status in ('completed', 'closed') and user_role != LoginUser.ROLE_MANAGEMENT:
             return Response({"detail": "Only Delivery Manager can do this"}, status=403)
 
-        if new_status in ('in_progress', 'at_risk') and user_role != 'pm':
+        if new_status in ('in_progress', 'at_risk') and user_role != LoginUser.ROLE_PM:
             return Response({"detail": "Only Project Manager can do this"}, status=403)
 
         old_status = project.status
@@ -134,6 +135,7 @@ class ProjectStatusUpdateAPIView(APIView):
 class ModuleStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, module_id):
         module = get_object_or_404(ProjectModule, id=module_id)
 
@@ -141,10 +143,10 @@ class ModuleStatusUpdateAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         new_status = serializer.validated_data['status']
 
-        if new_status in ('in_progress', 'blocked', 'completed') and request.user.role != 'tl':
+        if new_status in ('in_progress', 'blocked', 'completed') and request.user.role != LoginUser.ROLE_TL:
             return Response({"detail": "Only TL allowed"}, status=403)
 
-        if new_status == 'returned' and request.user.role != 'pm':
+        if new_status == 'returned' and request.user.role != LoginUser.ROLE_PM:
             return Response({"detail": "Only PM allowed"}, status=403)
 
         old_status = module.status
@@ -170,6 +172,7 @@ class ModuleStatusUpdateAPIView(APIView):
 class TaskStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
 
@@ -180,7 +183,7 @@ class TaskStatusUpdateAPIView(APIView):
         if new_status == 'review' and request.user != task.assigned_to:
             return Response({"detail": "Only assignee can submit for review"}, status=403)
 
-        if new_status in ('rework', 'completed') and request.user.role != 'tl':
+        if new_status in ('rework', 'completed') and request.user.role != LoginUser.ROLE_TL:
             return Response({"detail": "Only TL allowed"}, status=403)
 
         old_status = task.status
@@ -206,13 +209,14 @@ class TaskStatusUpdateAPIView(APIView):
 class SubTaskStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, subtask_id):
         subtask = get_object_or_404(SubTask, id=subtask_id)
         ser = SubTaskStatusUpdateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         new_status = ser.validated_data['status']
 
-        if request.user.role == 'tl':
+        if request.user.role == LoginUser.ROLE_TL:
             subtask.status = new_status
             subtask.approved_by_tl = request.user
 
@@ -285,7 +289,7 @@ class ProjectHierarchyAPIView(APIView):
 
         # Visibility rules
         user = request.user
-        if user.role == 'employee':
+        if user.role == LoginUser.ROLE_EMPLOYEE:
             if not Task.objects.filter(
                 module__project=project,
                 assigned_to=user
@@ -348,7 +352,7 @@ class EmployeeProjectStatusAPIView(APIView):
     permission_classes = [IsAuthenticated, IsEmployee]
 
     def get(self, request):
-        tasks = Task.objectsfilter(assigned_to=request.user).select_related(
+        tasks = Task.objects.filter(assigned_to=request.user).select_related(
             'module__project'
         )
 
@@ -373,7 +377,7 @@ class EmployeeProjectStatusAPIView(APIView):
                 if task.status in ['in_progress', 'review', 'rework']:
                     project_data[project_id]['in_progress_tasks'] += 1
                 elif task.status == 'assigned':
-                    project_data['project_id']['todo_tasks'] += 1
+                    project_data[project_id]['todo_tasks'] += 1
 
         result = [p for p in project_data.values() if p['total_tasks'] > 0]
 

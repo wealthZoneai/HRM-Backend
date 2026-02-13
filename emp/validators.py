@@ -1,17 +1,23 @@
 # emp/validators.py
+
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
+import os
+
+MAX_FILE_MB = 5
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf"}
 
 
-def validate_file_size(value):
-    limit_mb = 5
-    if value.size > limit_mb * 1024 * 1024:
+def validate_file_size(value: UploadedFile):
+    # Enforce max upload size
+    if value.size > MAX_FILE_MB * 1024 * 1024:
         raise ValidationError(
-            f'File too large. Size should not exceed {limit_mb} MB.')
+            f"File too large. Maximum size allowed is {MAX_FILE_MB} MB."
+        )
 
 
-def validate_image_extension(value):
-    valid_ext = ['.jpg', '.jpeg', '.png', '.gif', '.pdf']
-    import os
+def validate_image_extension(value: UploadedFile):
+    # Prevent extension spoofing
     ext = os.path.splitext(value.name)[1].lower()
-    if ext not in valid_ext:
-        raise ValidationError('Unsupported file extension.')
+    if ext not in ALLOWED_EXTENSIONS:
+        raise ValidationError("Unsupported file extension.")

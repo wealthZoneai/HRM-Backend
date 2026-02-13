@@ -1,5 +1,7 @@
 from django.utils.dateparse import parse_datetime
 from django.db.models import Q
+from jsonschema import ValidationError
+
 
 class AttendanceCorrectionService:
 
@@ -43,6 +45,10 @@ class AttendanceCorrectionService:
 
         # ---------------- HR note handling ----------------
         hr_note = f"HR correction: {note}"
+
+        if attendance.clock_in and attendance.clock_out:
+            if attendance.clock_out <= attendance.clock_in:
+                raise ValidationError("Clock-out must be after clock-in.")
 
         if not attendance.note:
             attendance.note = hr_note

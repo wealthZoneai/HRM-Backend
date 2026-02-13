@@ -16,6 +16,8 @@ from .permissions import IsTL
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db import IntegrityError
+from login.models import User as LoginUser
+from django.db import transaction
 
 User = get_user_model()
 
@@ -42,7 +44,8 @@ class TLPendingLeaveAPIView(generics.ListAPIView):
 
 class TLApproveRejectLeaveAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTL]
-
+    
+    @transaction.atomic
     def post(self, request, leave_id):
         leave = get_object_or_404(LeaveRequest, id=leave_id)
 
@@ -201,7 +204,9 @@ class TeamLeadListAPIView(APIView):
         dept = request.query_params.get('department')
 
         qs = User.objects.filter(
-            role__iexact='tl', employeeprofile__isnull=False)
+            role=LoginUser.ROLE_TL,
+            employeeprofile__isnull=False
+        )
 
         if dept:
             qs = qs.filter(employeeprofile__department__iexact=dept)
@@ -323,14 +328,14 @@ def tl_create_announcement(request):
 def list_announcements(request):
     user = request.user
 
-    if user.role == 'tl':
+    if user.role == LoginUser.ROLE_TL:
         announcements = TLAnnouncement.objects.filter(
             created_by=user
         ).order_by("-date")
 
     else:
         try:
-            profile = EmployeeProfile.objects.get(user.user)
+            profile = EmployeeProfile.objects.get(user=user)
             announcements = TLAnnouncement.objects.filter(
                 created_by=profile.team_lead
             ).order_by("-date")

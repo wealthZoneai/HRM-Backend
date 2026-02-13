@@ -1,22 +1,33 @@
-# hr/permissions.py
-from rest_framework import permissions
+from rest_framework.permissions import BasePermission
+from login.models import User
 
 
-class IsHR(permissions.BasePermission):
-    """Allow only HR and management roles."""
-
-    def has_permission(self, request, view):
-        user = getattr(request, "user", None)
-        if not user or not getattr(user, "is_authenticated", False):
-            return False
-        role = (getattr(user, "role", "") or "").lower()
-        return role in ("hr", "management")
-
-
-
-class IsTL(permissions.BasePermission):
-    """Allow only TL (team lead)."""
-
+class IsHR(BasePermission):
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and getattr(user, 'role', None) == 'tl')
+        return bool(
+            user and user.is_authenticated and
+            user.role in (User.ROLE_HR, User.ROLE_MANAGEMENT)
+        )
+
+
+class IsTL(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user and user.is_authenticated and user.role == User.ROLE_TL
+        )
+
+
+class IsHRorDMorPM(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user and user.is_authenticated and
+            user.role in (
+                User.ROLE_HR,
+                User.ROLE_MANAGEMENT,
+                User.ROLE_DM,
+                User.ROLE_PM,
+            )
+        )

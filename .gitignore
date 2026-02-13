@@ -53,4 +53,4 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-
+db.sqlite3

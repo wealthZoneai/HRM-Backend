@@ -1,10 +1,11 @@
-# tl/permissions.py
-from rest_framework import permissions
+from rest_framework.permissions import BasePermission
+from login.models import User
 
 
-class IsTL(permissions.BasePermission):
-    """Allow only Team Leaders."""
-
+class IsTL(BasePermission):
     def has_permission(self, request, view):
-        role = getattr(request.user, "role", "") or ""
-        return bool(request.user and request.user.is_authenticated and role.lower() == "tl")
+        user = request.user
+        return bool(
+            user and user.is_authenticated and
+            user.role == User.ROLE_TL
+        )

@@ -265,6 +265,10 @@ class Attendance(models.Model):
         else:
             self.status = 'absent'
 
+        if self.clock_in:
+            self.late_arrivals = timezone.localtime(
+                self.clock_in).time() > time(9, 45)
+
     def worked_duration(self):
         if not self.clock_in:
             return timedelta(0)
@@ -416,10 +420,10 @@ class LeaveBalance(models.Model):
     used = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
 
     def available(self):
-        return float(self.total_allocated) - float(self.used)
+        return self.total_allocated - self.used
 
     def __str__(self):
-        return f"{self.profile.emp_id} - {self.leave_type.name} : {self.available()}"
+        return f"{self.profile.emp_id} - {self.leave_type} : {self.available()}"
 
 
 class LeaveRequest(models.Model):

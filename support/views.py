@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-
+from login.models import User as LoginUser
 from .models import SupportTicket, LoginSupportTicket
 from .serializers import (
     SupportTicketCreateSerializer,
@@ -10,6 +10,7 @@ from .serializers import (
     SupportMessageCreateSerializer,
     LoginSupportTicketSerializer
 )
+
 
 class CreateSupportTicketAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -26,6 +27,7 @@ class CreateSupportTicketAPIView(APIView):
             status=201
         )
 
+
 class MySupportTicketsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -36,24 +38,37 @@ class MySupportTicketsAPIView(APIView):
         serializer = SupportTicketDetailSerializer(tickets, many=True)
         return Response(serializer.data)
 
+
 class SupportTicketDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, ticket_id):
         ticket = get_object_or_404(SupportTicket, id=ticket_id)
 
-        if ticket.created_by != request.user and request.user.role not in ('hr', 'management', 'it'):
+        if ticket.created_by != request.user and request.user.role not in (
+            LoginUser.ROLE_HR,
+            LoginUser.ROLE_MANAGEMENT,
+            LoginUser.ROLE_IT,
+        ):
             return Response({"detail": "Not allowed"}, status=403)
 
         return Response(
             SupportTicketDetailSerializer(ticket).data
         )
 
+
 class SendSupportMessageAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, ticket_id):
         ticket = get_object_or_404(SupportTicket, id=ticket_id)
+
+        if (
+            ticket.created_by != request.user and
+            request.user.role not in (
+                LoginUser.ROLE_HR, LoginUser.ROLE_MANAGEMENT, LoginUser.ROLE_IT)
+        ):
+            return Response({"detail": "Not allowed"}, status=403)
 
         if ticket.status == 'CLOSED':
             return Response(
@@ -73,17 +88,23 @@ class SendSupportMessageAPIView(APIView):
 
         return Response({"message": "Sent"})
 
+
 class SupportQueueAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.role not in ('hr', 'management', 'it'):
+        if request.user.role not in (
+            LoginUser.ROLE_HR,
+            LoginUser.ROLE_MANAGEMENT,
+            LoginUser.ROLE_IT,
+        ):
             return Response({"detail": "Not allowed"}, status=403)
 
         tickets = SupportTicket.objects.exclude(status='CLOSED')
         return Response(
             SupportTicketDetailSerializer(tickets, many=True).data
         )
+
 
 class CreateLoginSupportTicketAPIView(APIView):
     authentication_classes = []

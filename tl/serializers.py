@@ -21,7 +21,17 @@ class TLAnnouncementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TLAnnouncement
-        fields = "__all__"
+        fields = (
+            "id",
+            "title",
+            "description",
+            "date",
+            "time",
+            "priority",
+            "created_by",
+            "created_role",
+            "show_in_calendar",
+        )
         read_only_fields = ("created_by", "created_role", "id")
 
     def validate(self, attrs):

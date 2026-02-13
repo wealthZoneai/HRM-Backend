@@ -3,15 +3,16 @@ from pathlib import Path
 from datetime import timedelta
 import sys
 import dj_database_url
- 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "django-insecure-ii-#!%hvxy_3rcdes57n&x+oak$&b1u22r&)%z!=%fy0-6g!h@")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY not set")
 
 DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -20,7 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
- 
+
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -28,10 +29,9 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
-    'hr', 'emp', 'tl', 'login', 'management', 'projects','support',
+    'hr', 'emp', 'tl', 'login', 'management', 'projects', 'support',
 ]
- 
- 
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -43,10 +43,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
- 
- 
+
 ROOT_URLCONF = 'HRM.urls'
- 
+
 WSGI_APPLICATION = 'HRM.wsgi.application'
 
 REST_FRAMEWORK = {
@@ -69,22 +68,18 @@ REST_FRAMEWORK = {
         "user": "60/min",
     },
 
-
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
-
 
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
- 
- 
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'HRM API',
     'DESCRIPTION': 'HRM REST API',
     'VERSION': '1.0.0',
 }
-
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
@@ -93,8 +88,7 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
- 
- 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -109,8 +103,7 @@ TEMPLATES = [
         },
     },
 ]
- 
- 
+
 DATABASES = {
     'default': dj_database_url.parse(
         os.environ.get(
@@ -121,8 +114,7 @@ DATABASES = {
         ssl_require=False
     )
 }
- 
- 
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -138,15 +130,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 AUTH_USER_MODEL = 'login.User'
- 
+
 LANGUAGE_CODE = 'en-us'
- 
+
 TIME_ZONE = 'Asia/Kolkata'
- 
+
 USE_I18N = True
- 
+
 USE_TZ = True
 
 
@@ -168,7 +159,7 @@ try:
 
         insert_index = 2 if len(MIDDLEWARE) >= 2 else len(MIDDLEWARE)
         MIDDLEWARE.insert(insert_index, wn_mw)
- 
+
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 except Exception:
 

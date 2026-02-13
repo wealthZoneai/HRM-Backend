@@ -13,15 +13,30 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = "__all__"
-        read_only_fields = ('delivery_manager', 'status')
+        fields = (
+            "id",
+            "name",
+            "description",
+            "delivery_manager",
+            "project_manager",
+            "status",
+            "created_at",
+        )
+        read_only_fields = ("delivery_manager", "status")
 
 
 class ProjectModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectModule
-        fields = "__all__"
-        read_only_fields = ('project', 'status')
+        fields = (
+            "id",
+            "project",
+            "name",
+            "description",
+            "team_lead",
+            "status",
+        )
+        read_only_fields = ("project", "status")
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -29,15 +44,35 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = "__all__"
-        read_only_fields = ('module', 'created_by', 'status')
+        fields = (
+            "id",
+            "module",
+            "title",
+            "description",
+            "assigned_to",
+            "created_by",
+            "status",
+            "assigned_date",
+            "due_date",
+        )
+        read_only_fields = ("module", "created_by", "status")
+
 
 
 class SubTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubTask
-        fields = "__all__"
-        read_only_fields = ('task','created_by', 'approved_by_tl', 'status')
+        fields = (
+            "id",
+            "task",
+            "title",
+            "description",
+            "created_by",
+            "status",
+            "approved_by_tl",
+        )
+        read_only_fields = ("task", "created_by", "approved_by_tl", "status")
+
 
 
 class ProjectStatusUpdateSerializer(serializers.Serializer):
@@ -76,8 +111,9 @@ class TaskReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ('id', 'title', 'status', 'assigned_to', 'created_by_name','assigned_date','due_date', 'subtasks')
-    
+        fields = ('id', 'title', 'status', 'assigned_to',
+                  'created_by_name', 'assigned_date', 'due_date', 'subtasks')
+
     def get_created_by_name(self, obj):
         """Return the full name of the team lead who created the task"""
         user = obj.created_by
@@ -103,7 +139,9 @@ class ProjectReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'description', 'status', 'project_manager', 'delivery_manager', 'created_at', 'modules')
+        fields = ('id', 'name', 'description', 'status',
+                  'project_manager', 'delivery_manager', 'created_at', 'modules')
+
 
 class AssignPMSerializer(serializers.Serializer):
     project_manager = serializers.SlugRelatedField(
@@ -111,6 +149,7 @@ class AssignPMSerializer(serializers.Serializer):
         queryset=get_user_model().objects.all(),
         required=True
     )
+
 
 class EmployeeProjectStatusSerializer(serializers.Serializer):
     project_id = serializers.IntegerField()

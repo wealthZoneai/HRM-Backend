@@ -7,9 +7,7 @@ from django.utils import timezone
 from datetime import datetime
 from decimal import Decimal
 from .models import TLAnnouncement as HR_TLAnnouncement
-from django.utils import timezone
-from datetime import datetime
-from decimal import Decimal
+from login.models import User
 
 User = get_user_model()
 
@@ -49,12 +47,13 @@ class EmployeeHRContactUpdateSerializer(serializers.ModelSerializer):
 class EmployeeHRRoleUpdateSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(
         choices=[
-            ("employee", "Employee"),
-            ("intern", "Intern"),
-            ("tl", "Team Lead"),
-            ("hr", "HR"),
-            ("management", "Management"),
+            (User.ROLE_EMPLOYEE, "Employee"),
+            (User.ROLE_INTERN, "Intern"),
+            (User.ROLE_TL, "Team Lead"),
+            (User.ROLE_HR, "HR"),
+            (User.ROLE_MANAGEMENT, "Management"),
         ]
+
     )
 
     class Meta:
@@ -77,9 +76,31 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmployeeProfile
-        fields = '__all__'
-        read_only_fields = ('emp_id', 'work_email',
-                            'username', 'created_at', 'user')
+        fields = (
+            "id",
+            "emp_id",
+            "user",
+            "first_name",
+            "middle_name",
+            "last_name",
+            "personal_email",
+            "work_email",
+            "phone_number",
+            "alternate_number",
+            "dob",
+            "gender",
+            "marital_status",
+            "blood_group",
+            "job_title",
+            "department",
+            "employment_type",
+            "start_date",
+            "location",
+            "team_lead",
+            "is_active",
+            "profile_photo",
+            "created_at",
+        )
 
 
 class FlexibleTeamLeadField(serializers.PrimaryKeyRelatedField):
@@ -98,7 +119,7 @@ class FlexibleTeamLeadField(serializers.PrimaryKeyRelatedField):
 
 class EmployeeJobBankUpdateSerializer(serializers.ModelSerializer):
     team_lead = FlexibleTeamLeadField(queryset=User.objects.filter(
-        role='tl'), required=False, allow_null=True)
+        role=User.ROLE_TL), required=False, allow_null=True)
 
     class Meta:
         model = EmployeeProfile
@@ -109,31 +130,69 @@ class EmployeeJobBankUpdateSerializer(serializers.ModelSerializer):
 class ShiftSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift
-        fields = '__all__'
+        fields = (
+            "id",
+            "name",
+            "start_time",
+            "end_time",
+            "grace_minutes",
+            "is_active",
+        )
 
 
 class AttendanceAdminSerializer(serializers.ModelSerializer):
     user = UserBasicSerializer(read_only=True)
     department = serializers.CharField(
-        source='user.employeeprofile.department',
+        source="user.employeeprofile.department",
         read_only=True
     )
 
     class Meta:
         model = Attendance
-        fields = '__all__'
+        fields = (
+            "id",
+            "user",
+            "department",
+            "date",
+            "clock_in",
+            "clock_out",
+            "status",
+            "worked_seconds",
+            "overtime_seconds",
+            "late_arrivals",
+            "manual_entry",
+            "note",
+        )
 
 
 class CalendarEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = CalendarEvent
-        fields = '__all__'
+        fields = (
+            "id",
+            "title",
+            "description",
+            "event_type",
+            "date",
+            "start_time",
+            "end_time",
+            "created_by",
+            "extra",
+        )
 
 
 class SalaryStructureSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalaryStructure
-        fields = '__all__'
+        fields = (
+            "id",
+            "name",
+            "monthly_ctc",
+            "basic_percent",
+            "hra_percent",
+            "other_allowances",
+            "overtime_multiplier",
+        )
 
 
 class EmployeeSalaryAdminSerializer(serializers.ModelSerializer):
@@ -141,7 +200,13 @@ class EmployeeSalaryAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmployeeSalary
-        fields = '__all__'
+        fields = (
+            "id",
+            "profile",
+            "structure",
+            "effective_from",
+            "is_active",
+        )
 
 
 class PayslipAdminSerializer(serializers.ModelSerializer):
@@ -149,7 +214,20 @@ class PayslipAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payslip
-        fields = '__all__'
+        fields = (
+            "id",
+            "profile",
+            "year",
+            "month",
+            "working_days",
+            "days_present",
+            "gross_amount",
+            "overtime_amount",
+            "deductions",
+            "net_amount",
+            "finalized",
+            "generated_at",
+        )
 
 
 class MySalaryDetailSerializer(serializers.ModelSerializer):
@@ -195,7 +273,13 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LeaveBalance
-        fields = '__all__'
+        fields = (
+            "id",
+            "profile",
+            "leave_type",
+            "total_allocated",
+            "used",
+        )
 
 
 class LeaveRequestAdminSerializer(serializers.ModelSerializer):
@@ -203,7 +287,19 @@ class LeaveRequestAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LeaveRequest
-        fields = '__all__'
+        fields = (
+            "id",
+            "profile",
+            "leave_type",
+            "start_date",
+            "end_date",
+            "days",
+            "status",
+            "reason",
+            "applied_on",
+            "tl",
+            "hr",
+        )
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -246,7 +342,6 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
 
-    
         if qs.exists():
             raise serializers.ValidationError(
                 "An announcement already exists at this date and time."
@@ -254,17 +349,20 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         return attrs
 
 
-# class TLAnnouncementSerializer(serializers.ModelSerializer):
-#     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
-
-#     class Meta:
-#         model = HR_TLAnnouncement
-#         fields = "__all__"
-#         read_only_fields = ("created_by", "created_at", "id")
 class TLAnnouncementSerializer(serializers.ModelSerializer):
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = HR_TLAnnouncement
-        fields = "__all__"
+        fields = (
+            "id",
+            "title",
+            "description",
+            "date",
+            "time",
+            "priority",
+            "created_by",
+            "created_at",
+            "show_in_calendar",
+        )
         read_only_fields = ("created_by", "created_at", "id")

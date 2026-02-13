@@ -108,9 +108,7 @@ urlpatterns = [
 
     path('hr/dashboard/stats/', views.HRDashboardStatsAPIView.as_view(),
          name='hr-dashboard-stats'),
-]
 
-urlpatterns += [
     path(
         "documents/<str:emp_id>/<str:doc_field>/", views.ProtectedEmployeeDocumentView.as_view(),
         name="protected_employee_document",
