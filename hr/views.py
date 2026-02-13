@@ -16,7 +16,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 import calendar
 from django.contrib.auth import get_user_model
-from .serializers import AnnouncementSerializer, TLAnnouncementSerializer, MySalaryDetailSerializer
+from .serializers import AnnouncementSerializer, MySalaryDetailSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Announcement
 from django.db import IntegrityError, transaction
@@ -250,7 +250,7 @@ def emp_tl_announcements(request):
 #     serializer = TLAnnouncementSerializer(announcements, many=True)
 #     return Response(serializer.data)
     announcements = TLAnnouncement.objects.filter(created_by=tl)
-    serializer = TLAnnouncementSerializer(announcements, many=True)
+    serializer = AnnouncementSerializer(announcements, many=True)
     return Response(serializer.data)
 
 

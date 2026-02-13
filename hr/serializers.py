@@ -6,7 +6,6 @@ from .models import Announcement
 from django.utils import timezone
 from datetime import datetime
 from decimal import Decimal
-from .models import TLAnnouncement as HR_TLAnnouncement
 from login.models import User
 
 User = get_user_model()
@@ -347,22 +346,3 @@ class AnnouncementSerializer(serializers.ModelSerializer):
                 "An announcement already exists at this date and time."
             )
         return attrs
-
-
-class TLAnnouncementSerializer(serializers.ModelSerializer):
-    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
-
-    class Meta:
-        model = HR_TLAnnouncement
-        fields = (
-            "id",
-            "title",
-            "description",
-            "date",
-            "time",
-            "priority",
-            "created_by",
-            "created_at",
-            "show_in_calendar",
-        )
-        read_only_fields = ("created_by", "created_at", "id")

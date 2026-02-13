@@ -1,16 +1,11 @@
 from django.contrib import admin
-from .models import Announcement, SalaryStructure, Payslip, TLAnnouncement
+from .models import Announcement, SalaryStructure, Payslip
 
 
 @admin.register(Announcement)
 class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ("title", "date", "time", "priority", "created_by")
     search_fields = ("title",)
-
-
-@admin.register(TLAnnouncement)
-class TLAnnouncementAdmin(admin.ModelAdmin):
-    list_display = ("title", "date", "time", "priority", "created_by")
 
 
 @admin.register(SalaryStructure)

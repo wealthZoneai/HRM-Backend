@@ -1,10 +1,13 @@
 import os
+from dotenv import load_dotenv
 from pathlib import Path
 from datetime import timedelta
 import sys
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
