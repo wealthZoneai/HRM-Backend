@@ -1,7 +1,7 @@
 # emp/views.py
 from emp.utils import generate_emp_id, get_employee_profile_or_404
 from emp.services import AttendanceQueryService, AttendanceReportService, AttendanceService
-from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner
+from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner, IsEmployee
 from django.utils.dateparse import parse_date, parse_datetime
 from urllib.parse import unquote
 from .serializers import (
@@ -35,7 +35,7 @@ from hr.serializers import AnnouncementSerializer
 from datetime import datetime, time
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import FileResponse, Http404 
+from django.http import FileResponse, Http404
 import mimetypes
 from login.models import User as LoginUser
 
@@ -83,57 +83,121 @@ class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        prof = request.user.employeeprofile
-        return Response(serializers.EmployeeProfileReadSerializer(prof).data)
+        user = request.user
+        role = getattr(user, "role", "").lower()
+
+        # Base user info (always returned)
+        base_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": role,
+        }
+
+        # EMPLOYEE / INTERN
+        if role in ("employee", "intern"):
+            if not hasattr(user, "employeeprofile"):
+                return Response(
+                    {"detail": "Employee profile not found."},
+                    status=404
+                )
+
+            profile = user.employeeprofile
+            profile_data = EmployeeProfileReadSerializer(
+                profile,
+                context={"request": request}
+            ).data
+
+            return Response({
+                "type": "employee",
+                "user": base_data,
+                "profile": profile_data
+            })
+
+        # TEAM LEAD
+        if role == "tl":
+            return Response({
+                "type": "tl",
+                "user": base_data
+            })
+
+        # HR
+        if role == "hr":
+            return Response({
+                "type": "hr",
+                "user": base_data
+            })
+
+        # MANAGEMENT
+        if role == "management":
+            return Response({
+                "type": "management",
+                "user": base_data
+            })
+
+        # Fallback (unknown role)
+        return Response({
+            "type": "unknown",
+            "user": base_data
+        })
 
 
 class ProtectedEmployeeDocumentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, emp_id, doc_field):
-        """
-        emp_id     -> EmployeeProfile.emp_id
-        doc_field  -> model field name (aadhaar_front_image, pan_back_image, etc)
-        """
+        # 1. Fetch Profile
+        profile = get_object_or_404(EmployeeProfile, emp_id=emp_id)
+
+        # 2. Permission Check
+        user = request.user
+        # Allow if user is HR/Management OR if the user owns the profile
+        if user.role not in (LoginUser.ROLE_HR, LoginUser.ROLE_MANAGEMENT) and profile.user != user:
+            raise Http404("Not authorized")
+
+        # 3. Whitelist Check
+        allowed_fields = {
+            "profile_photo",
+            "aadhaar_front_image", "aadhaar_back_image",
+            "pan_front_image", "pan_back_image",
+            "passport_front_image", "passport_back_image",
+            "id_image",
+        }
+        if doc_field not in allowed_fields:
+            raise Http404("Invalid document field")
+
+        # 4. Get File Field
+        file_field = getattr(profile, doc_field, None)
+
+        # 5. Verify file exists
+        if not file_field or not file_field.name:
+            raise Http404("File not set in database")
 
         try:
-            profile = EmployeeProfile.objects.get(emp_id=emp_id)
-        except EmployeeProfile.DoesNotExist:
-            raise Http404("Employee not found")
+            # 6. Open the file specifically in Read-Binary mode
+            # We use the storage backend's open method
+            file_handle = file_field.open('rb')
 
-        # --- ACCESS CONTROL ---
-        user = request.user
-        if user.role not in (LoginUser.ROLE_HR, LoginUser.ROLE_MANAGEMENT) and profile.user != user:
-            raise Http404("Not allowed")
+            # 7. Guess MIME type
+            content_type, _ = mimetypes.guess_type(file_field.name)
 
-        # --- VALID FIELDS (whitelist) ---
-        allowed_fields = {
-            "aadhaar_front_image",
-            "aadhaar_back_image",
-            "pan_front_image",
-            "pan_back_image",
-            "passport_front_image",
-            "passport_back_image",
-        }
+            # 8. Return response
+            response = FileResponse(
+                file_handle, content_type=content_type or "image/jpeg")
 
-        if doc_field not in allowed_fields:
-            raise Http404("Invalid document")
+            # 9. Set Inline disposition so browser renders it (doesn't download)
+            response[
+                "Content-Disposition"] = f'inline; filename="{file_field.name.split("/")[-1]}"'
 
-        file = getattr(profile, doc_field, None)
-        if not file:
-            raise Http404("File not found")
+            return response
 
-        content_type, _ = mimetypes.guess_type(file.path)
-
-        response = FileResponse(
-            open(file.path, "rb"),
-            content_type=content_type or "application/octet-stream"
-        )
-
-        # ✅ FORCE INLINE VIEW (not download)
-        response["Content-Disposition"] = f'inline; filename="{file.name}"'
-
-        return response
+        except FileNotFoundError:
+            raise Http404("File missing from storage")
+        except Exception as e:
+            # Log error if needed: print(e)
+            raise Http404("Error retrieving file")
 
 
 class MyNotificationsList(generics.ListAPIView):
@@ -640,13 +704,11 @@ class TimesheetDailyFormAPIView(APIView):
     GET -> returns today's date/day, optional clock_in/out (from TimesheetDay or entries),
     existing entries, and total hours for the day.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmployee]
 
     def get(self, request):
         user = request.user
-        prof = getattr(user, "employeeprofile", None)
-        if not prof:
-            return Response({"detail": "Employee profile not found."}, status=400)
+        prof = user.employeeprofile
 
         today = timezone.localdate()
 
@@ -692,7 +754,7 @@ class TimesheetDailyFormAPIView(APIView):
 
 
 class TimesheetDailyUpdateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmployee]
 
     @transaction.atomic
     def post(self, request):
@@ -787,7 +849,7 @@ class TimesheetDailyUpdateAPIView(APIView):
 
 
 class TimesheetSubmitAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmployee]
 
     def post(self, request):
         user = request.user
@@ -1477,6 +1539,7 @@ class HRDashboardStatsAPIView(APIView):
 
 class UpdateContactView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def patch(self, request):
         try:

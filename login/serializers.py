@@ -11,13 +11,26 @@ import re
 User = get_user_model()
 
 
-class CustomTokenSerializer(TokenObtainPairSerializer):
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
+
+        # Add role into JWT payload
         token["role"] = user.role
         token["username"] = user.username
+
         return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        # Add these fields in login response
+        data["role"] = self.user.role.lower()  # force lowercase
+        data["username"] = self.user.username
+
+        return data
 
 
 class ForgotPasswordSerializer(serializers.Serializer):

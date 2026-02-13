@@ -4,6 +4,23 @@ from rest_framework.permissions import BasePermission
 from login.models import User
 
 
+class IsEmployee(BasePermission):
+    """
+    Allows access only to users that have an EmployeeProfile.
+    Prevents HR / Management / Superuser from accessing employee-only APIs.
+    """
+
+    message = "This API is available only for employees."
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        return hasattr(user, "employeeprofile")
+
+
 class IsHROrManagement(BasePermission):
     def has_permission(self, request, view):
         user = request.user

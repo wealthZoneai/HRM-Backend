@@ -13,15 +13,15 @@ LEAVE_TYPE_CHOICES = [
 # First value = DB-safe constant
 # Second value = human readable label
 EMPLOYEE_DEPARTMENT_CHOICES = [
-    ("PYTHON", "Python"),
+    ("Python", "Python"),
     ("QA", "QA"),
-    ("JAVA", "Java"),
-    ("UIUX", "UI/UX"),
-    ("REACT", "React"),
-    ("CYBER_SECURITY", "Cyber Security"),
-    ("DIGITAL_MARKETING", "Digital Marketing"),
+    ("Java", "Java"),
+    ("UI/UX", "UI/UX"),
+    ("React", "React"),
+    ("Cyber Security", "Cyber Security"),
+    ("Digital Marketing", "Digital Marketing"),
     ("HR", "HR"),
     ("BDM", "BDM"),
-    ("NETWORKING", "Networking"),
-    ("CLOUD", "Cloud"),
+    ("Networking", "Networking"),
+    ("Cloud", "Cloud"),
 ]

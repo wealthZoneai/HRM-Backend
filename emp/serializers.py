@@ -203,15 +203,8 @@ class EmployeeCreateSerializer(serializers.Serializer):
         user.set_unusable_password()
         user.save(update_fields=["password"])
 
-        # 2️⃣ Create employee profile (ONLY PLACE)
-        profile = EmployeeProfile.objects.create(
-            user=user,
-            work_email=email,
-            first_name=first_name,
-            last_name=last_name,
-            role=role,
-            start_date=timezone.localdate(),
-        )
+        # Profile already created by signal
+        profile = user.employeeprofile
 
         # 3️⃣ Update remaining fields
         profile.middle_name = contact.get('middle_name')
@@ -288,22 +281,24 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     def get_protected_profile_photo_url(self, obj):
         if not obj.profile_photo:
             return None
-        request = self.context.get("request", None)
-        try:
-            url = reverse("protected_employee_media",
-                          args=[obj.pk, "profile_photo"])
-        except Exception:
-            return None
+
+        request = self.context.get("request")
+
+        # REMOVE try/except block to expose configuration errors
+        url = reverse(
+            "protected_employee_document",
+            kwargs={"emp_id": obj.emp_id, "doc_field": "profile_photo"}
+        )
+
         if request:
             return request.build_absolute_uri(url)
-
         return url
 
     def get_protected_aadhaar_image_url(self, obj):
         request = self.context.get("request", None)
         try:
-            url = reverse("protected_employee_media",
-                          args=[obj.pk, "aadhaar_image"])
+            url = reverse("protected_employee_document",
+                          args=[obj.emp_id, "aadhaar_image"])
         except Exception:
             return None
         if request:
@@ -313,8 +308,8 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     def get_protected_pan_image_url(self, obj):
         request = self.context.get("request", None)
         try:
-            url = reverse("protected_employee_media",
-                          args=[obj.pk, "pan_image"])
+            url = reverse("protected_employee_document",
+                          args=[obj.emp_id, "pan_image"])
         except Exception:
             return None
         if request:
@@ -324,8 +319,8 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
     def get_protected_passport_image_url(self, obj):
         request = self.context.get("request", None)
         try:
-            url = reverse("protected_employee_media",
-                          args=[obj.pk, "passport_image"])
+            url = reverse("protected_employee_document",
+                          args=[obj.emp_id, "passport_image"])
         except Exception:
             return None
         if request:
@@ -337,8 +332,8 @@ class EmployeeProfileReadSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get("request", None)
         try:
-            url = reverse("protected_employee_media",
-                          args=[obj.pk, "id_image"])
+            url = reverse("protected_employee_document",
+                          args=[obj.emp_id, "id_image"])
         except Exception:
             return None
         if request:

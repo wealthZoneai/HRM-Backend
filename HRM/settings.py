@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
-    'hr', 'emp', 'tl', 'login', 'management', 'projects', 'support',
+    'hr', 'emp.apps.EmpConfig', 'tl', 'login', 'management', 'projects', 'support',
 ]
 
 MIDDLEWARE = [
@@ -171,17 +171,19 @@ except Exception:
 
 MEDIA_URL = "/media/"
 
-MEDIA_ROOT = BASE_DIR / "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_EXPOSE_HEADERS = ["Content-Type", "Content-Disposition"]
 
 CORS_ALLOWED_ORIGINS = []
 
-CORS_ALLOW_CREDENTIALS = False
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = [
     'accept',
