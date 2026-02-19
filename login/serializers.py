@@ -38,7 +38,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         email = validated_data["email"].lower()
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if not user:
             return {"email": email}  # avoid email enumeration
@@ -62,8 +62,20 @@ class ResetPasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Password must contain uppercase letter")
 
+        if not re.search(r"[a-z]", data["new_password"]):
+            raise serializers.ValidationError(
+                "Password must contain lowercase letter")
+
         if not re.search(r"[0-9]", data["new_password"]):
             raise serializers.ValidationError("Password must contain a number")
+
+        if not re.search(r"[@$!%*?&]", data["new_password"]):
+            raise serializers.ValidationError(
+                "Password must contain a special character")
+
+        if len(data["new_password"]) < 8:
+            raise serializers.ValidationError(
+                "Password must be at least 8 characters long")
 
         return data
 
