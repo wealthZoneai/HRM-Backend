@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Announcement, SalaryStructure, Payslip
+from .models import Announcement, Payslip
 
 
 @admin.register(Announcement)
@@ -8,16 +8,16 @@ class AnnouncementAdmin(admin.ModelAdmin):
     search_fields = ("title",)
 
 
-@admin.register(SalaryStructure)
-class SalaryStructureAdmin(admin.ModelAdmin):
-    list_display = (
-        "name",
-        "monthly_ctc",
-        "basic_percent",
-        "hra_percent",
-        "overtime_multiplier",
-    )
-    search_fields = ("name",)
+# @admin.register(SalaryStructure)
+# class SalaryStructureAdmin(admin.ModelAdmin):
+#     list_display = (
+#         "name",
+#         "monthly_ctc",
+#         "basic_percent",
+#         "hra_percent",
+#         "overtime_multiplier",
+#     )
+#     search_fields = ("name",)
 
 
 @admin.register(Payslip)
