@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.contrib.auth.password_validation import validate_password
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 from .models import PasswordResetOTP
 from .utils import generate_otp, send_otp_email
@@ -37,17 +38,26 @@ class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def create(self, validated_data):
-        email = validated_data["email"].lower()
-        user = User.objects.filter(email__iexact=email).first()
+        input_email = validated_data["email"].lower()
+        user = User.objects.filter(
+            Q(email__iexact=input_email) | Q(
+                employeeprofile__work_email__iexact=input_email)
+        ).first()
 
         if not user:
-            return {"email": email}  # avoid email enumeration
+            return {"email": input_email}  # avoid email enumeration
 
         otp = generate_otp()
         PasswordResetOTP.create_otp(user, otp)
-        send_otp_email(email, otp)
+        target_email = input_email
+        if hasattr(user, 'employeeprofile') and user.employeeprofile.work_email:
+            target_email = user.employeeprofile.work_email
+        else:
+            target_email = user.email
 
-        return {"email": email}
+        send_otp_email(target_email, otp)
+
+        return {"email": input_email}
 
 
 class ResetPasswordSerializer(serializers.Serializer):
