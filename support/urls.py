@@ -1,5 +1,12 @@
 from django.urls import path
-from .views import *
+from .views import (
+    CreateSupportTicketAPIView,
+    MySupportTicketsAPIView,
+    SupportTicketDetailAPIView,
+    SendSupportMessageAPIView,
+    SupportQueueAPIView,
+    CreateLoginSupportTicketAPIView
+)
 
 app_name = 'support'
 

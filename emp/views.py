@@ -1,4 +1,5 @@
 # emp/views.py
+from email import policy
 from emp.utils import generate_emp_id, get_employee_profile_or_404
 from emp.services import AttendanceQueryService, AttendanceReportService, AttendanceService
 from .permissions import IsTLOnly, IsHROrManagement, IsTLorHRorOwner, IsEmployee
@@ -249,7 +250,7 @@ class DashboardSummaryAPIView(APIView):
             y, m = d.year, d.month
 
         qs = models.Attendance.objects.filter(
-            user=user, date__year=y, date__month=m, status='completed')
+            user=user, date__year=y, date__month=m, status__in=['present', 'halfday'])
         days_present = qs.count()
         total_seconds = qs.aggregate(total=Sum('duration_seconds'))[
             'total'] or 0
@@ -500,10 +501,6 @@ class HRCreateEmployeeAPIView(APIView):
         # serializer creates user + profile (without emp_id)
         user, profile = serializer.save()
 
-        # ✅ FIX 2: emp_id generated ONLY here
-        profile.emp_id = generate_emp_id()
-        profile.save(update_fields=["emp_id"])
-
         return Response(
             EmployeeProfileReadSerializer(
                 profile,
@@ -608,7 +605,10 @@ class HRTLActionAPIView(APIView):
                 )
 
             if action == "approve":
-                lr.apply_tl_approval(user, approve=True, remarks=remarks)
+                try:
+                    lr.apply_tl_approval(user, approve=True, remarks=remarks)
+                except DjangoValidationError as e:
+                    return Response({"detail": e.messages}, status=400)
 
                 # Notify HR
                 for hr_user in User.objects.filter(role__in=["hr", "management"]):
@@ -629,7 +629,10 @@ class HRTLActionAPIView(APIView):
                 )
 
             if action == "reject":
-                lr.apply_tl_approval(user, approve=False, remarks=remarks)
+                try:
+                    lr.apply_tl_approval(user, approve=False, remarks=remarks)
+                except DjangoValidationError as e:
+                    return Response({"detail": e.messages}, status=400)
 
                 models.Notification.objects.create(
                     to_user=lr.profile.user,
@@ -1372,16 +1375,18 @@ class PolicyCreateAPIView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         policy = serializer.save()
-
         employees = User.objects.all()  # all employees
-        for emp in employees:
-            Notification.objects.create(
+        
+        notifications = [
+            Notification(
                 to_user=emp,
                 title=f"New Policy Added: {policy.title}",
                 body=f"A new policy '{policy.title}' has been added.",
                 notif_type='policy',
                 is_read=False
-            )
+            ) for emp in employees
+        ]
+        Notification.objects.bulk_create(notifications)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -1412,14 +1417,16 @@ class PolicyUpdateAPIView(generics.UpdateAPIView):
         policy = serializer.save()
 
         employees = User.objects.all()
-        for emp in employees:
-            Notification.objects.create(
+        notifications = [
+            Notification(
                 to_user=emp,
-                title=f"Policy Updated: {policy.title}",
-                body=f"The policy '{policy.title}' has been updated.",
+                title=f"New Policy Added: {policy.title}",
+                body=f"A new policy '{policy.title}' has been added.",
                 notif_type='policy',
                 is_read=False
-            )
+            ) for emp in employees
+        ]
+        Notification.objects.bulk_create(notifications)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -1450,14 +1457,16 @@ class PolicyDeleteAPIView(generics.DestroyAPIView):
         instance.delete()
 
         employees = User.objects.all()
-        for emp in employees:
-            Notification.objects.create(
+        notifications = [
+            Notification(
                 to_user=emp,
-                title=f"Policy Deleted: {policy_title}",
-                body=f"The policy '{policy_title}' has been deleted.",
+                title=f"New Policy Added: {policy.title}",
+                body=f"A new policy '{policy.title}' has been added.",
                 notif_type='policy',
                 is_read=False
-            )
+            ) for emp in employees
+        ]
+        Notification.objects.bulk_create(notifications)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

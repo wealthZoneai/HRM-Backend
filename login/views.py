@@ -10,6 +10,7 @@ from .serializers import (
 
 
 class CustomLoginView(TokenObtainPairView):
+    permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
 
 

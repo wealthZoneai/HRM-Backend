@@ -833,6 +833,8 @@ class DailyTimesheetUpdateSerializer(serializers.Serializer):
         login_dt = attendance.clock_in
         logout_dt = attendance.clock_out
 
+        login_dt_clean = login_dt.replace(second=0, microsecond=0)
+
         intervals = []
 
         for idx, e in enumerate(entries, start=1):
@@ -846,7 +848,7 @@ class DailyTimesheetUpdateSerializer(serializers.Serializer):
             s_dt = timezone.make_aware(datetime.combine(date, s))
             e_dt = timezone.make_aware(datetime.combine(date, en))
 
-            if s_dt < login_dt:
+            if s_dt < login_dt_clean:
                 raise ValidationError(f"Entry #{idx}: starts before clock-in.")
 
             if logout_dt and e_dt > logout_dt:

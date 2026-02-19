@@ -152,22 +152,7 @@ STATICFILES_DIRS = [
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-
-try:
-    import importlib
-    importlib.import_module('whitenoise')
-
-    wn_mw = 'whitenoise.middleware.WhiteNoiseMiddleware'
-    if wn_mw not in MIDDLEWARE:
-
-        insert_index = 2 if len(MIDDLEWARE) >= 2 else len(MIDDLEWARE)
-        MIDDLEWARE.insert(insert_index, wn_mw)
-
-    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-except Exception:
-
-    STATICFILES_STORAGE = None
-
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 MEDIA_URL = "/media/"
 
@@ -177,7 +162,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_EXPOSE_HEADERS = ["Content-Type", "Content-Disposition"]
 

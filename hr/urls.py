@@ -50,8 +50,7 @@ urlpatterns = [
     path('announcement/<int:pk>/delete/',
          views.delete_announcement, name='delete-announcement'),
 
-    path("tl-announcements/", views.emp_tl_announcements,
-         name="emp_tl_announcements"),
+    path('announcement/list/', views.list_announcements, name='announcements_list'),
 
     path('salary-structures/', views.SalaryStructureListCreateAPIView.as_view(),
          name='hr-salary-structures'),

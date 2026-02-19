@@ -4,48 +4,38 @@ from . import views
 app_name = "projects"
 
 urlpatterns = [
-    path("dm/project/create/", views.DMCreateProjectAPIView.as_view()),
-
-    path("dm/project/<int:project_id>/assign-pm/", views.DMAssignPMAPIView.as_view()),
-
+    path("dm/project/create/", views.DMCreateProjectAPIView.as_view(),
+         name="dm-project-create"),
+    path("dm/project/<int:project_id>/assign-pm/",
+         views.DMAssignPMAPIView.as_view(), name="dm-assign-pm"),
     path("pm/project/<int:project_id>/module/create/",
-         views.PMCreateModuleAPIView.as_view()),
-
+         views.PMCreateModuleAPIView.as_view(), name="pm-create-module"),
     path("tl/module/<int:module_id>/task/create/",
-         views.TLCreateTaskAPIView.as_view()),
-
+         views.TLCreateTaskAPIView.as_view(), name="tl-create-task"),
     path("employee/task/<int:task_id>/subtask/create/",
-         views.EmployeeCreateSubTaskAPIView.as_view()),
-
+         views.EmployeeCreateSubTaskAPIView.as_view(), name="emp-create-subtask"),
     path("project/<int:project_id>/status/",
-         views.ProjectStatusUpdateAPIView.as_view()),
-
+         views.ProjectStatusUpdateAPIView.as_view(), name="project-status-update"),
     path("module/<int:module_id>/status/",
-         views.ModuleStatusUpdateAPIView.as_view()),
-
-    path("task/<int:task_id>/status/", views.TaskStatusUpdateAPIView.as_view()),
-
+         views.ModuleStatusUpdateAPIView.as_view(), name="module-status-update"),
+    path("task/<int:task_id>/status/",
+         views.TaskStatusUpdateAPIView.as_view(), name="task-status-update"),
     path("subtask/<int:subtask_id>/status/",
-         views.SubTaskStatusUpdateAPIView.as_view()),
-
-    path("dashboard/dm/", views.DMDashboardAPIView.as_view()),
-
-    path("dashboard/pm/", views.PMDashboardAPIView.as_view()),
-
-    path("dashboard/tl/", views.TLDashboardAPIView.as_view()),
-
+         views.SubTaskStatusUpdateAPIView.as_view(), name="subtask-status-update"),
+    path("dashboard/dm/", views.DMDashboardAPIView.as_view(), name="dm-dashboard"),
+    path("dashboard/pm/", views.PMDashboardAPIView.as_view(), name="pm-dashboard"),
+    path("dashboard/tl/", views.TLDashboardAPIView.as_view(), name="tl-dashboard"),
     path("project/<int:project_id>/tree/",
-         views.ProjectHierarchyAPIView.as_view()),
-
-    path("analytics/hr/", views.HRProjectAnalyticsAPIView.as_view()),
-
-    path("dm/projects/", views.DMProjectListAPIView.as_view()),
-
-    path("pm/projects/", views.PMProjectListAPIView.as_view()),
-
-    path("tl/modules/", views.TLModuleListAPIView.as_view()),
-
-    path("employee/tasks/", views.EmployeeTaskListAPIView.as_view()),
-
-    path("employee/project-status/", views.EmployeeProjectStatusAPIView.as_view()),
+         views.ProjectHierarchyAPIView.as_view(), name="project-hierarchy"),
+    path("analytics/hr/", views.HRProjectAnalyticsAPIView.as_view(),
+         name="hr-project-analytics"),
+    path("dm/projects/", views.DMProjectListAPIView.as_view(),
+         name="dm-project-list"),
+    path("pm/projects/", views.PMProjectListAPIView.as_view(),
+         name="pm-project-list"),
+    path("tl/modules/", views.TLModuleListAPIView.as_view(), name="tl-module-list"),
+    path("employee/tasks/", views.EmployeeTaskListAPIView.as_view(),
+         name="emp-task-list"),
+    path("employee/project-status/",
+         views.EmployeeProjectStatusAPIView.as_view(), name="emp-project-status"),
 ]

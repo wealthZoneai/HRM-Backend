@@ -159,14 +159,15 @@ class EmployeeProfile(models.Model):
     def is_on_leave(self, start, end):
         """
         Returns True if this employee has any leave overlapping start..end.
-        We exclude rejected leaves.
+        We exclude rejected and cancelled leaves.
         """
-        from .models import LeaveRequest
+        from django.apps import apps
+        LeaveRequest = apps.get_model('emp', 'LeaveRequest')
 
         return LeaveRequest.objects.filter(
             profile=self,
         ).exclude(
-            status__in=['tl_rejected', 'hr_rejected', 'rejected']
+            status__in=['tl_rejected', 'hr_rejected', 'cancelled']
         ).filter(
             start_date__lte=end,
             end_date__gte=start
@@ -630,6 +631,9 @@ class TimesheetEntry(models.Model):
         unique_together = ('profile', 'date', 'start_time', 'end_time')
 
     def clean(self):
+        # Guard against None values to prevent TypeError crashes during validation
+        if not self.start_time or not self.end_time or not self.date:
+            return
 
         if self.end_time <= self.start_time:
             raise ValidationError("End time must be after start time.")
@@ -644,7 +648,6 @@ class TimesheetEntry(models.Model):
         qs = TimesheetEntry.objects.filter(profile=self.profile, date=self.date).exclude(
             pk=self.pk).order_by('start_time')
         for e in qs:
-
             if not (self.end_time <= e.start_time or self.start_time >= e.end_time):
                 raise ValidationError(
                     "Time entry overlaps another entry for the same day. Please fix the times.")

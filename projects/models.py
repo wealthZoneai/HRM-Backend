@@ -39,7 +39,11 @@ class Project(models.Model):
             raise ValidationError("PM can only be assigned in Draft state.")
         self.project_manager = user
         self.status = 'assigned_pm'
-        self.save(update_fields=['project_manager', 'status'])
+
+        if self.pk:
+            self.save(update_fields=['project_manager', 'status'])
+        else:
+            self.save()
 
 
 class ProjectModule(models.Model):
@@ -101,7 +105,11 @@ class Task(models.Model):
         if self.subtasks.exclude(status='completed').exists():
             raise ValidationError("All subtasks must be completed.")
         self.status = 'completed'
-        self.save(update_fields=['status'])
+
+        if self.pk:
+            self.save(update_fields=['status'])
+        else:
+            self.save()
 
 
 class SubTask(models.Model):
