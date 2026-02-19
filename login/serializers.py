@@ -69,7 +69,7 @@ class ResetPasswordSerializer(serializers.Serializer):
         if not re.search(r"[0-9]", data["new_password"]):
             raise serializers.ValidationError("Password must contain a number")
 
-        if not re.search(r"[@$!%*?&]", data["new_password"]):
+        if not re.search(r"[^A-Za-z0-9]", data["new_password"]):
             raise serializers.ValidationError(
                 "Password must contain a special character")
 
