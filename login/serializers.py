@@ -67,10 +67,11 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
         latest_otp = PasswordResetOTP.objects.filter(
             user=user).order_by('-created_at').first()
+
         if latest_otp:
-            time_passed = timezone.now() - latest_otp.created_at
+            # OPTIMIZATION: Reused 'now' variable here
+            time_passed = now - latest_otp.created_at
             if time_passed < timedelta(minutes=5):
-                # Calculate remaining time for a better error message (optional)
                 remaining_time = 5 - int(time_passed.total_seconds() // 60)
                 raise serializers.ValidationError({
                     "email": f"Please wait at least {remaining_time} more minute(s) before requesting a new OTP."
@@ -78,6 +79,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
         otp = generate_otp()
         PasswordResetOTP.create_otp(user, otp)
+
         target_email = input_email
         if hasattr(user, 'employeeprofile') and user.employeeprofile.work_email:
             target_email = user.employeeprofile.work_email
@@ -96,11 +98,13 @@ class ResetPasswordSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        # 1. Password Matching
         if data.get("new_password") != data.get("confirm_password"):
             raise serializers.ValidationError({
                 "confirm_password": "Passwords do not match."
             })
 
+        # 2. Password Complexity
         validate_password(data["new_password"])
 
         if not re.search(r"[A-Z]", data["new_password"]):
@@ -122,30 +126,67 @@ class ResetPasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Password must be at least 8 characters long")
 
+        # 3. Secure OTP Validation
+        email = data["email"].lower()
+        otp = data["otp"]
+
+        # Find the correct user (checking both base email and work_email)
+        user = User.objects.filter(
+            Q(email__iexact=email) | Q(employeeprofile__work_email__iexact=email)
+        ).first()
+
+        if not user:
+            raise serializers.ValidationError({"email": "User not found."})
+
+        # Fetch the most recent unused OTP for this exact user
+        otp_obj = (
+            PasswordResetOTP.objects
+            .filter(user=user, is_used=False)
+            .order_by("-created_at")
+            .first()
+        )
+
+        # Strict sequential checks
+        if not otp_obj:
+            raise serializers.ValidationError(
+                {"otp": "No active OTP found. Please request a new one."})
+
+        if otp_obj.is_expired():
+            raise serializers.ValidationError(
+                {"otp": "OTP has expired. Please request a new one."})
+
+        if not otp_obj.verify_otp(otp):
+            raise serializers.ValidationError(
+                {"otp": "Invalid OTP. Please try again."})
+
+        # Pass the validated objects to the create method safely
+        data["valid_otp_obj"] = otp_obj
+        data["target_user"] = user
+
         return data
 
     def create(self, validated_data):
         email = validated_data["email"].lower()
-        otp = validated_data["otp"]
+        user = validated_data["target_user"]
+        validated_otp_obj = validated_data["valid_otp_obj"]
 
         with transaction.atomic():
-            # Lock OTP rows to prevent replay attacks
-            otp_obj = (
+            # CRITICAL FIX: Lock the exact OTP row we already validated by its ID
+            # This prevents replay attacks without breaking the work_email logic
+            locked_otp = (
                 PasswordResetOTP.objects
                 .select_for_update()
-                .filter(user__email=email, is_used=False)
-                .order_by("-created_at")
-                .first()
+                .get(id=validated_otp_obj.id)
             )
 
-            if not otp_obj or otp_obj.is_expired() or not otp_obj.verify_otp(otp):
-                raise serializers.ValidationError("Invalid or expired OTP")
+            if locked_otp.is_used:
+                raise serializers.ValidationError(
+                    "This OTP was just used in another request.")
 
-            user = otp_obj.user
             user.set_password(validated_data["new_password"])
             user.save(update_fields=["password"])
 
-            otp_obj.is_used = True
-            otp_obj.save(update_fields=["is_used"])
+            locked_otp.is_used = True
+            locked_otp.save(update_fields=["is_used"])
 
         return {"email": email}

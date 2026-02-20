@@ -13,7 +13,7 @@ def generate_otp():
 
 def send_otp_email(email, otp):
     subject = "Password Reset OTP - HRMS Portal"
-    message = f"Your OTP is {otp}. It is valid for 10 minutes."
+    message = f"Your OTP is {otp}. It is valid for 5 minutes."
 
     send_mail(
         subject,
