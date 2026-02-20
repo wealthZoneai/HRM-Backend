@@ -8,6 +8,8 @@ from django.core.exceptions import ValidationError
 from .models import PasswordResetOTP
 from .utils import generate_otp, send_otp_email
 import re
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -39,13 +41,40 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         input_email = validated_data["email"].lower()
+
+        # Lookup user by checking both the base email AND the EmployeeProfile work_email
         user = User.objects.filter(
             Q(email__iexact=input_email) | Q(
                 employeeprofile__work_email__iexact=input_email)
         ).first()
 
         if not user:
-            return {"email": input_email}  # avoid email enumeration
+            return {"email": input_email}
+
+        now = timezone.now()
+
+        # --- Max 3 OTPs per hour limit ---
+        one_hour_ago = now - timedelta(hours=1)
+        recent_otps_count = PasswordResetOTP.objects.filter(
+            user=user,
+            created_at__gte=one_hour_ago
+        ).count()
+
+        if recent_otps_count >= 3:
+            raise serializers.ValidationError({
+                "email": "You have reached the maximum limit of 3 OTP requests per hour. Please try again later."
+            })
+
+        latest_otp = PasswordResetOTP.objects.filter(
+            user=user).order_by('-created_at').first()
+        if latest_otp:
+            time_passed = timezone.now() - latest_otp.created_at
+            if time_passed < timedelta(minutes=5):
+                # Calculate remaining time for a better error message (optional)
+                remaining_time = 5 - int(time_passed.total_seconds() // 60)
+                raise serializers.ValidationError({
+                    "email": f"Please wait at least {remaining_time} more minute(s) before requesting a new OTP."
+                })
 
         otp = generate_otp()
         PasswordResetOTP.create_otp(user, otp)
@@ -64,8 +93,14 @@ class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        if data.get("new_password") != data.get("confirm_password"):
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match."
+            })
+
         validate_password(data["new_password"])
 
         if not re.search(r"[A-Z]", data["new_password"]):
