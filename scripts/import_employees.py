@@ -1,11 +1,9 @@
 import csv
 from datetime import datetime
-
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
-
 from emp.models import EmployeeProfile
 
 User = get_user_model()
