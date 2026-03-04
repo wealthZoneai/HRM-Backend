@@ -13,7 +13,7 @@ CORS_ALLOW_CREDENTIALS = False
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# Use sqlite3 for dev
+# # Use sqlite3 for dev
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',

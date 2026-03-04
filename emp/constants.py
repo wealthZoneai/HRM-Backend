@@ -1,12 +1,12 @@
 # emp/constants.py
 
 LEAVE_TYPE_CHOICES = [
-    ("CASUAL", "Casual Leave"),
-    ("SICK", "Sick Leave"),
-    ("PAID", "Paid Leave"),
-    ("UNPAID", "Unpaid Leave"),
-    ("MATERNITY", "Maternity Leave"),
-    ("PATERNITY", "Paternity Leave"),
+    ("CASUAL", "Casual_Leave"),
+    ("SICK", "Sick_Leave"),
+    ("PAID", "Paid_Leave"),
+    ("UNPAID", "Unpaid_Leave"),
+    ("MATERNITY", "Maternity_Leave"),
+    ("PATERNITY", "Paternity_Leave"),
 ]
 
 # IMPORTANT:
