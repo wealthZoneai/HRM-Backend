@@ -26,8 +26,9 @@ class LongLeave(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.leave_type}"
-
+#============
 #Reports
+#============
 from django.db import models
 class Client(models.Model):
     name = models.CharField(max_length = 100)

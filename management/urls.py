@@ -10,6 +10,7 @@ urlpatterns = [
 
     path('admin/on-leave/', views.ADMINOnLeaveAPIView.as_view(), name='admin-on-leave'),
 
+
     path('admin/pending-requests/', views.ADMINPendingRequestsAPIView.as_view(), name='admin-pending-requests'),
 
     path('admin/late-arrivals/', views.ADMINLateArrivalsAPIView.as_view(), name='admin-late-arrivals'),
@@ -42,11 +43,17 @@ urlpatterns = [
     path('admin/attrition/dashboard/',views.adminAttritionDashboardAPIView.as_view(),name='admin-attrition-dashboard'),
 
 #reports
-    # path("admin-dashboard/", views.Admin_dashboard_projects),
-    # path("admin-clients/", views.Admin_clients),
-    # path("admin-projects/", views.Admin_projects),
-    # path("admin-managers/", views.Admin_managers),
-    # path("module-progress/", views.module_progress),
-    # path("risk-alerts/", views.risk_alerts),
+    path("admin/dashboard/", views.AdminDashboardAPIView.as_view(),name="admin-dashboard"),
+
+    path("admin/clients/", views.AdminClientsAPIView.as_view(),name="admin-clients"),
+
+    path("admin/projects/", views.AdminProjectsAPIView.as_view(),name="admin-projects"),
+
+    path("admin/managers/", views.AdminManagersAPIView.as_view(),name="admin-managers"),
+
+    path("admin/module-progress/", views.ModuleProgressAPIView.as_view(),name="module-progress"),
+
+    path("admin/risk-alerts/", views.RiskAlertsAPIView.as_view(),name="risk-alerts"),
 
 ]
+

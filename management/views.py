@@ -744,3 +744,126 @@ class adminAttritionDashboardAPIView(APIView):
         }
 
         return Response(data)
+
+#============
+#reports
+#===========
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from emp.permissions import IsHROrManagement
+from .models import Project, Client, DeliveryManager, ModuleProgress, RiskAlert
+from .serializers import AdminDashboardSerializer, ModuleProgressSerializer, RiskAlertSerializer
+
+
+class AdminDashboardAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        client = request.GET.get("client")
+        project = request.GET.get("project")
+        delivery = request.GET.get("delivery")
+
+        projects = Project.objects.all()
+
+        if client:
+            projects = projects.filter(client__name__icontains=client)
+
+        if project:
+            projects = projects.filter(project__icontains=project)
+
+        if delivery:
+            projects = projects.filter(delivery__name__icontains=delivery)
+
+        serializer = AdminDashboardSerializer(projects, many=True)
+
+        return Response(serializer.data)
+
+
+class AdminClientsAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        clients = Client.objects.all()
+
+        data = []
+
+        for c in clients:
+            data.append({
+                "id": c.id,
+                "name": c.name
+            })
+
+        return Response(data)
+
+
+class AdminProjectsAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        projects = Project.objects.all()
+
+        data = []
+
+        for p in projects:
+            data.append({
+                "id": p.id,
+                "name": p.project
+            })
+
+        return Response(data)
+
+
+class AdminManagersAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        managers = DeliveryManager.objects.all()
+
+        data = []
+
+        for m in managers:
+            data.append({
+                "id": m.id,
+                "name": m.name
+            })
+
+        return Response(data)
+
+
+class ModuleProgressAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        project = request.GET.get("project")
+
+        modules = ModuleProgress.objects.all()
+
+        if project:
+            modules = modules.filter(project__project=project)
+
+        serializer = ModuleProgressSerializer(modules, many=True)
+
+        return Response(serializer.data)
+
+
+class RiskAlertsAPIView(APIView):
+
+    permission_classes = [IsHROrManagement]
+
+    def get(self, request):
+
+        alerts = RiskAlert.objects.all()
+
+        serializer = RiskAlertSerializer(alerts, many=True)
+
+        return Response(serializer.data)

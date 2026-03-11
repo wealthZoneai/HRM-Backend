@@ -19,6 +19,12 @@ emp_id_validator = RegexValidator(
 
 
 class EmployeeProfile(models.Model):
+    is_active = models.BooleanField(default=True)
+ 
+    exit_reason = models.CharField(max_length=200, null=True, blank=True)
+ 
+    updated_at = models.DateTimeField(auto_now=True)
+    
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='employeeprofile')
 
