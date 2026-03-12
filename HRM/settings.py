@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
-    'hr', 'emp.apps.EmpConfig', 'tl', 'login', 'management', 'projects', 'support',
+    'hr', 'emp.apps.EmpConfig', 'tl', 'login', 'management', 'projects', 'support', 'pm',
 ]
 
 MIDDLEWARE = [

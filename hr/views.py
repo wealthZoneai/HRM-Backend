@@ -24,6 +24,44 @@ from django.utils.dateparse import parse_datetime
 from .service import AttendanceCorrectionService
 
 
+# hr/views.py
+
+class HRListInactiveEmployeesAPIView(generics.ListAPIView):
+    """
+    Shows a list of employees whose accounts are disabled.
+    """
+    permission_classes = [IsAuthenticated, IsHRorDMorPM]
+    serializer_class = serializers.EmployeeListSerializer
+
+    def get_queryset(self):
+        # We only want profiles where is_active is False
+        return EmployeeProfile.objects.filter(is_active=False).select_related('user')
+
+
+class HRDirectInactivateAPIView(APIView):
+    """
+    HR clicks a button to immediately disable an employee.
+    """
+    permission_classes = [IsAuthenticated, IsHR]
+
+    def post(self, request, pk):
+        # 1. Find the employee
+        profile = get_object_or_404(EmployeeProfile, pk=pk)
+
+        # 2. Deactivate the profile
+        profile.is_active = False
+        profile.save()
+
+        # 3. Deactivate the User login account (Crucial step)
+        user_account = profile.user
+        user_account.is_active = False
+        user_account.save()
+
+        return Response({
+            "message": f"Employee {profile.first_name} has been inactivated successfully."
+        }, status=status.HTTP_200_OK)
+
+
 User = get_user_model()
 
 

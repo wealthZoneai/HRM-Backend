@@ -20,6 +20,12 @@ urlpatterns = [
 
     path('employees/<int:pk>/job&bank/',
          views.HRUpdateJobBankAPIView.as_view(), name='hr-employee-jobbank'),
+    
+    # List only inactive employees
+    path('employees/inactive-list/', views.HRListInactiveEmployeesAPIView.as_view(), name='hr-inactive-list'),
+ 
+    # Action to inactivate an employee directly
+    path('employees/<int:pk>/inactivate/', views.HRDirectInactivateAPIView.as_view(), name='hr-direct-inactivate'),
 
     path('attendance/', views.HRAttendanceListAPIView.as_view(),
          name='hr-attendance-list'),
