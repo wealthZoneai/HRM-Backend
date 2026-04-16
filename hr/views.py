@@ -32,6 +32,7 @@ class HRListInactiveEmployeesAPIView(generics.ListAPIView):
     """
     permission_classes = [IsAuthenticated, IsHRorDMorPM]
     serializer_class = serializers.EmployeeListSerializer
+    pagination_class = None
 
     def get_queryset(self):
         # We only want profiles where is_active is False
@@ -82,6 +83,7 @@ class HRUpdateEmployeeRoleAPIView(generics.UpdateAPIView):
 class HRListEmployeesAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsHRorDMorPM]
     serializer_class = serializers.EmployeeListSerializer
+    pagination_class = None
 
     def get_queryset(self):
         qs = EmployeeProfile.objects.all().select_related('user')

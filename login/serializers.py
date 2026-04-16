@@ -14,41 +14,43 @@ from datetime import timedelta
 
 User = get_user_model()
 
+
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from emp.models import EmployeeProfile
-
-
+ 
+ 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-
+ 
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-
+ 
         token["role"] = user.role
         token["username"] = user.username
-
+ 
         # add employee_id inside JWT payload
         try:
             token["employee_id"] = user.employeeprofile.emp_id
         except EmployeeProfile.DoesNotExist:
             token["employee_id"] = None
-
+ 
         return token
-
+ 
+ 
     def validate(self, attrs):
         data = super().validate(attrs)
-
+ 
         # existing response fields
         data["role"] = self.user.role.lower()
         data["username"] = self.user.username
-
+ 
         # ADD THIS PART
         try:
             employee = EmployeeProfile.objects.get(user=self.user)
             data["employee_id"] = employee.emp_id
         except EmployeeProfile.DoesNotExist:
             data["employee_id"] = None
-
+ 
         return data
 
 class ForgotPasswordSerializer(serializers.Serializer):
