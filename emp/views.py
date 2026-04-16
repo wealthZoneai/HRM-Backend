@@ -145,6 +145,17 @@ class MyProfileView(APIView):
         })
 
 
+from rest_framework.viewsets import ModelViewSet
+from .models import EmployeeProfile
+from .serializers import EmployeeSerializer
+from .pagination import EmployeePagination
+
+
+class EmployeeViewSet(ModelViewSet):
+    queryset = EmployeeProfile.objects.all()
+    serializer_class = EmployeeSerializer
+    pagination_class = EmployeePagination
+
 class ProtectedEmployeeDocumentView(APIView):
     permission_classes = [IsAuthenticated]
 

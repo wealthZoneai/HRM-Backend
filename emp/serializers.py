@@ -23,6 +23,16 @@ User = get_user_model()
 today = timezone.localdate()
 
 
+from rest_framework import serializers
+from .models import EmployeeProfile
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeProfile
+        fields = "__all__"
+
+
 class ContactSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=True, max_length=80)
     middle_name = serializers.CharField(

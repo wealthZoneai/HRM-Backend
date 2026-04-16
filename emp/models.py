@@ -47,7 +47,7 @@ class EmployeeProfile(models.Model):
     alternate_number = models.CharField(max_length=20, null=True, blank=True)
 
     dob = models.DateField(null=True, blank=True)
-    blood_group = models.CharField(max_length=5, null=True, blank=True)
+    blood_group = models.CharField(max_length=10, null=True, blank=True)
 
     gender = models.CharField(max_length=20, null=True, blank=True)
     marital_status = models.CharField(max_length=20, null=True, blank=True)

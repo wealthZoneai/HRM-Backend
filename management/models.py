@@ -1,5 +1,5 @@
 from django.db import models
-from django.conf import settings   # ✅ Use this instead of User
+from django.conf import settings   
 
 
 class LongLeave(models.Model):
@@ -12,7 +12,7 @@ class LongLeave(models.Model):
     ]
 
     employee = models.ForeignKey(
-        settings.AUTH_USER_MODEL,   # ✅ Correct way
+        settings.AUTH_USER_MODEL,   
         on_delete=models.CASCADE,
         related_name='long_leaves'
     )

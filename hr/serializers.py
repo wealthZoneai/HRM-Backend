@@ -321,7 +321,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         if self.instance:
             pass
         else:
-            # ✅ 1. Prevent past date
+            #  1. Prevent past date
             today = timezone.localdate()
             if date < today:
                 raise serializers.ValidationError(
@@ -336,7 +336,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
                         "Past time is not allowed for today's date."
                     )
 
-        # ✅ 3. Prevent duplicate date + time
+        # 3. Prevent duplicate date + time
         qs = Announcement.objects.filter(date=date, time=time)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -346,3 +346,5 @@ class AnnouncementSerializer(serializers.ModelSerializer):
                 "An announcement already exists at this date and time."
             )
         return attrs
+
+ 

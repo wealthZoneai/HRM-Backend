@@ -268,6 +268,8 @@ def delete_announcement(request, pk):
 #         user=request.user).select_related('team_lead').first()
 #     if not profile:
 #         return Response({"message": "No profile found for user"}, status=404)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def emp_tl_announcements(request):

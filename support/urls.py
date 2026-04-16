@@ -11,12 +11,16 @@ from .views import (
 app_name = 'support'
 
 urlpatterns = [
-    path('tickets/create/', CreateSupportTicketAPIView.as_view()),
-    path('tickets/my/', MySupportTicketsAPIView.as_view()),
-    path('tickets/<int:ticket_id>/', SupportTicketDetailAPIView.as_view()),
-    path('tickets/<int:ticket_id>/message/',
-         SendSupportMessageAPIView.as_view()),
-    path('support/queue/', SupportQueueAPIView.as_view()),
-    path('login-issues/create/', CreateLoginSupportTicketAPIView.as_view()),
 
+    path('tickets/', MySupportTicketsAPIView.as_view(), name='ticket-list'),
+    path('tickets/create/', CreateSupportTicketAPIView.as_view(), name='ticket-create'),
+    path('tickets/<int:ticket_id>/', SupportTicketDetailAPIView.as_view(), name='ticket-detail'),
+    path('tickets/<int:ticket_id>/messages/', SendSupportMessageAPIView.as_view(), name='ticket-message'),
+ 
+    # Support Queue (Admin/HR/IT)
+    path('tickets/queue/', SupportQueueAPIView.as_view(), name='ticket-queue'),
+ 
+    # Login Issues
+    path('login-issues/', CreateLoginSupportTicketAPIView.as_view(), name='login-issue-create'),
+    
 ]

@@ -27,7 +27,6 @@ class CreateSupportTicketAPIView(APIView):
             status=201
         )
 
-
 class MySupportTicketsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
